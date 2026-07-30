@@ -1,0 +1,147 @@
+# infra/proxy/dynamic.yml
+# Traefik dynamic configuration (routers, services, middlewares)
+
+http:
+  # ==========================================
+  # Middlewares
+  # ==========================================
+  middlewares:
+    # Security headers
+    security-headers:
+      headers:
+        customFrameOptionsValue: "SAMEORIGIN"
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        contentSecurityPolicy: "default-src 'self'; script-src 'self'; object-src 'none';"
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+
+    # Rate limiting
+    rate-limit-search:
+      rateLimit:
+        average: 30
+        burst: 10
+        period: 1m
+
+    rate-limit-grid:
+      rateLimit:
+        average: 60
+        burst: 20
+        period: 1m
+
+    rate-limit-alerts:
+      rateLimit:
+        average: 10
+        burst: 5
+        period: 1m
+
+    # Compress responses
+    compress:
+      compress: {}
+
+    # Retry failed requests
+    retry:
+      retry:
+        attempts: 3
+        initialInterval: "100ms"
+
+    # Circuit breaker for backend
+    circuit-breaker:
+      circuitBreaker:
+        expression: "LatencyAtQuantileMS(50.0) > 100"
+        fallbackDuration: "10s"
+        recoveryDuration: "10s"
+
+    # Basic auth for Traefik dashboard
+    dashboard-auth:
+      basicAuth:
+        users:
+          - "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"  # admin:admin (CHANGE THIS!)
+
+  # ==========================================
+  # Routers
+  # ==========================================
+  routers:
+    # API — main application
+    api:
+      rule: "Host(`api.yourdomain.com`)"
+      entryPoints:
+        - websecure
+      service: api-service
+      middlewares:
+        - security-headers
+        - compress
+        - retry
+      tls:
+        certResolver: letsencrypt
+
+    # API Search (stricter rate limit)
+    api-search:
+      rule: "Host(`api.yourdomain.com`) && PathPrefix(`/api/v1/products/search`)"
+      entryPoints:
+        - websecure
+      service: api-service
+      middlewares:
+        - security-headers
+        - rate-limit-search
+        - compress
+      priority: 100
+      tls:
+        certResolver: letsencrypt
+
+    # API Grid (moderate rate limit)
+    api-grid:
+      rule: "Host(`api.yourdomain.com`) && PathPrefix(`/api/v1/products/`)"
+      entryPoints:
+        - websecure
+      service: api-service
+      middlewares:
+        - security-headers
+        - rate-limit-grid
+        - compress
+      priority: 90
+      tls:
+        certResolver: letsencrypt
+
+    # API Alerts (strict rate limit)
+    api-alerts:
+      rule: "Host(`api.yourdomain.com`) && PathPrefix(`/api/v1/alerts`)"
+      entryPoints:
+        - websecure
+      service: api-service
+      middlewares:
+        - security-headers
+        - rate-limit-alerts
+        - compress
+      priority: 100
+      tls:
+        certResolver: letsencrypt
+
+    # Traefik Dashboard
+    dashboard:
+      rule: "Host(`traefik.yourdomain.com`)"
+      entryPoints:
+        - websecure
+      service: api@internal
+      middlewares:
+        - dashboard-auth
+      tls:
+        certResolver: letsencrypt
+
+  # ==========================================
+  # Services
+  # ==========================================
+  services:
+    api-service:
+      loadBalancer:
+        servers:
+          - url: "http://api:8000"
+        healthCheck:
+          path: /health
+          interval: "10s"
+          timeout: "5s"
+          unhealthyThreshold: 3
+          healthyThreshold: 2
+        passHostHeader: true

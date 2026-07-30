@@ -3,9 +3,11 @@
 Playwright-based page scraper with:
   - Browser pool (one browser per worker process, reusable contexts)
   - Configurable price & stock parsing
-  - Compliance gatekeeper integration
+  - Compliance gatekeeper integration (Protego robots.txt)
   - Structured logging
+  - Crawl-delay awareness
 """
+import asyncio
 import logging
 import re
 from typing import Any, Dict, Optional
@@ -60,20 +62,16 @@ def parse_price(raw: str) -> Optional[float]:
     """
     if not raw or not isinstance(raw, str):
         return None
-    # Remove currency symbols and common noise words
     cleaned = re.sub(r"[^\d.,]", "", raw.strip().lower())
     if not cleaned:
         return None
 
-    # Heuristic: determine decimal separator
     comma_idx = cleaned.rfind(",")
     dot_idx = cleaned.rfind(".")
 
     if comma_idx > dot_idx and (len(cleaned) - comma_idx - 1) == 2:
-        # European format: 1.299,99 or 1299,99
         cleaned = cleaned.replace(".", "").replace(",", ".")
     else:
-        # US/UK/IN format: 1,299.99 or 1299.99
         cleaned = cleaned.replace(",", "")
 
     try:
@@ -101,13 +99,19 @@ async def scrape_vendor_product_page(
     """
     Scrapes a single product page through the compliance gatekeeper.
     Returns structured payload or None on failure / blocked.
+    Respects robots.txt crawl-delay by adding a sleep if needed.
     """
     domain = get_domain_from_url(url)
-    allowed, reason = can_scrape_domain(url)
-    log_scrape_attempt(domain, url, allowed, reason)
+    allowed, reason, metadata = can_scrape_domain(url)
+    log_scrape_attempt(domain, url, allowed, reason, metadata)
+
     if not allowed:
         logger.warning(f"Scrape blocked for {url}: {reason}")
         return None
+
+    # Respect robots.txt crawl-delay
+    if metadata.get("crawl_delay"):
+        await asyncio.sleep(metadata["crawl_delay"])
 
     context = await _ensure_browser()
     page: Optional[Page] = None
@@ -129,14 +133,14 @@ async def scrape_vendor_product_page(
                 raw_stock = await page.inner_text(stock_selector)
                 in_stock = parse_stock_status(raw_stock, stock_text_present)
             except Exception:
-                in_stock = False  # If selector fails, assume out of stock
+                in_stock = False
 
         return {
             "raw_title": raw_title.strip()[:300],
             "price": cleaned_price,
             "product_url": url,
             "in_stock": in_stock,
-            "scraped_at": "now()",  # Placeholder; actual timestamp handled by DB
+            "scraped_at": "now()",
         }
     except Exception as e:
         logger.warning(f"Scrape failed for {url}: {e}")

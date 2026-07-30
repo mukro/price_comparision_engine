@@ -1,0 +1,6 @@
+# Add this to your app/celery_app.py beat_schedule dict:
+
+"archive-old-price-history-weekly": {
+    "task": "app.tasks.run_price_history_archive",
+    "schedule": crontab(day_of_week=0, hour=3, minute=0),  # Sunday 3 AM
+},

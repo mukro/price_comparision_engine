@@ -1,0 +1,40 @@
+# infra/proxy/docker-compose.traefik.yml
+# Add this to your main docker-compose.yml or run separately
+# This sets up Traefik as the reverse proxy with Let's Encrypt SSL
+
+version: "3.8"
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: price_traefik
+    restart: always
+    command:
+      - "--configFile=/etc/traefik/traefik.yml"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - traefik-certs:/letsencrypt
+    networks:
+      - app_network
+    labels:
+      - "traefik.enable=true"
+
+  # Update your API service labels for Traefik discovery:
+  # api:
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.api.rule=Host(`api.yourdomain.com`)"
+  #     - "traefik.http.routers.api.entrypoints=websecure"
+  #     - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+
+volumes:
+  traefik-certs:
+
+networks:
+  app_network:
+    external: true  # Use the same network as your main compose

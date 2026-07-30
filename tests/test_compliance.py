@@ -34,7 +34,7 @@ class TestGetDomainFromUrl:
 
 
 # ==========================================
-# Price Parsing (moved from scraper_worker for testability)
+# Price Parsing
 # ==========================================
 
 class TestParsePrice:
@@ -70,7 +70,7 @@ class TestParsePrice:
 
 
 # ==========================================
-# robots.txt compliance
+# robots.txt compliance (Protego)
 # ==========================================
 
 class TestRobotsCompliance:
@@ -79,26 +79,47 @@ class TestRobotsCompliance:
     def test_allowed_when_no_disallow(self, mock_fetch, mock_redis):
         mock_redis.get.return_value = None
         mock_fetch.return_value = "User-agent: *\nAllow: /"
-        assert _is_allowed_by_robots("example.com") is True
+        allowed, delay = _is_allowed_by_robots("example.com")
+        assert allowed is True
+        assert delay is None
 
     @patch("app.core.compliance.redis_client")
     @patch("app.core.compliance._fetch_robots_txt")
     def test_blocked_when_disallow_all(self, mock_fetch, mock_redis):
         mock_redis.get.return_value = None
         mock_fetch.return_value = "User-agent: *\nDisallow: /"
-        assert _is_allowed_by_robots("example.com") is False
+        allowed, delay = _is_allowed_by_robots("example.com")
+        assert allowed is False
+        assert delay is None
 
     @patch("app.core.compliance.redis_client")
     def test_uses_cache_when_available(self, mock_redis):
         mock_redis.get.return_value = "User-agent: *\nDisallow: /"
-        assert _is_allowed_by_robots("example.com") is False
+        allowed, delay = _is_allowed_by_robots("example.com")
+        assert allowed is False
+        assert delay is None
 
     @patch("app.core.compliance.redis_client")
     @patch("app.core.compliance._fetch_robots_txt")
     def test_permissive_when_robots_unreachable(self, mock_fetch, mock_redis):
         mock_redis.get.return_value = None
         mock_fetch.return_value = None
-        assert _is_allowed_by_robots("example.com") is True
+        allowed, delay = _is_allowed_by_robots("example.com")
+        assert allowed is True
+        assert delay is None
+
+    @patch("app.core.compliance.redis_client")
+    @patch("app.core.compliance._fetch_robots_txt")
+    def test_crawl_delay_extracted(self, mock_fetch, mock_redis):
+        mock_redis.get.return_value = None
+        mock_fetch.return_value = (
+            "User-agent: PriceComparisonBot\n"
+            "Crawl-delay: 5\n"
+            "Allow: /\n"
+        )
+        allowed, delay = _is_allowed_by_robots("example.com")
+        assert allowed is True
+        assert delay == 5.0
 
 
 # ==========================================
@@ -133,27 +154,29 @@ class TestCanScrapeDomain:
         mock_settings.ENFORCE_DOMAIN_ALLOWLIST = False
         mock_settings.ENFORCE_ROBOTS_TXT = True
         mock_settings.DEFAULT_SCRAPE_RPM = 6
-        mock_robots.return_value = True
+        mock_robots.return_value = (True, None)
         mock_ratelimit.return_value = True
 
-        # Mock DB cursor
         mock_cursor = MagicMock()
-        mock_cursor.fetchone.return_value = None  # No vendor-specific RPM
+        mock_cursor.fetchone.return_value = None
         mock_conn = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
         mock_get_conn.return_value.__enter__ = MagicMock(return_value=mock_conn)
         mock_get_conn.return_value.__exit__ = MagicMock(return_value=False)
 
-        allowed, reason = can_scrape_domain("https://example.com/product/123")
+        allowed, reason, metadata = can_scrape_domain("https://example.com/product/123")
         assert allowed is True
         assert reason == "OK"
+        assert metadata["domain"] == "example.com"
+        assert metadata["robots_allowed"] is True
 
     @patch("app.core.compliance.settings")
     def test_global_kill_switch(self, mock_settings):
         mock_settings.SCRAPING_ENABLED = False
-        allowed, reason = can_scrape_domain("https://example.com")
+        allowed, reason, metadata = can_scrape_domain("https://example.com")
         assert allowed is False
         assert "kill-switch" in reason.lower()
+        assert metadata["domain"] == "example.com"
 
     @patch("app.core.compliance.settings")
     @patch("app.core.compliance._is_allowed_by_robots")
@@ -161,8 +184,33 @@ class TestCanScrapeDomain:
         mock_settings.SCRAPING_ENABLED = True
         mock_settings.ENFORCE_ROBOTS_TXT = True
         mock_settings.ENFORCE_DOMAIN_ALLOWLIST = False
-        mock_robots.return_value = False
+        mock_robots.return_value = (False, None)
 
-        allowed, reason = can_scrape_domain("https://example.com")
+        allowed, reason, metadata = can_scrape_domain("https://example.com")
         assert allowed is False
         assert "robots.txt" in reason.lower()
+        assert metadata["robots_allowed"] is False
+
+    @patch("app.core.compliance.settings")
+    @patch("app.core.compliance._is_allowed_by_robots")
+    @patch("app.core.compliance._check_rate_limit")
+    @patch("app.core.compliance.get_conn")
+    def test_crawl_delay_respected(self, mock_get_conn, mock_ratelimit, mock_robots, mock_settings):
+        mock_settings.SCRAPING_ENABLED = True
+        mock_settings.ENFORCE_ROBOTS_TXT = True
+        mock_settings.ENFORCE_DOMAIN_ALLOWLIST = False
+        mock_settings.DEFAULT_SCRAPE_RPM = 60  # 1 per second
+        mock_robots.return_value = (True, 10.0)  # 10 second crawl-delay
+        mock_ratelimit.return_value = True
+
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = None
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_get_conn.return_value.__enter__ = MagicMock(return_value=mock_conn)
+        mock_get_conn.return_value.__exit__ = MagicMock(return_value=False)
+
+        allowed, reason, metadata = can_scrape_domain("https://example.com")
+        assert allowed is True
+        assert metadata["crawl_delay"] == 10.0
+        assert metadata["rate_limit_rpm"] == 6  # 60/10 = 6 RPM (stricter than default)
