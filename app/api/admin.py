@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
+from passlib.context import CryptContext
 from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel, EmailStr
 
@@ -12,8 +13,8 @@ from app.config import settings
 from app.db_sync import get_conn, invalidate_grid_cache
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/admin/auth/login")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class TokenData(BaseModel):
@@ -38,6 +39,13 @@ class ReviewDecisionSchema(BaseModel):
     correct_product_id: Optional[str] = None
 
 
+class ComplianceToggleSchema(BaseModel):
+    scraping_enabled: Optional[bool] = None
+    enforce_robots_txt: Optional[bool] = None
+    enforce_domain_allowlist: Optional[bool] = None
+    default_scrape_rpm: Optional[int] = None
+
+
 def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenData:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -60,14 +68,12 @@ def require_admin(current_user: TokenData = Depends(get_current_user)) -> TokenD
 # ------------------------------------------------------------------
 # Auth
 # ------------------------------------------------------------------
-# NOTE: single hardcoded admin credential from settings, meant to unblock
-# local dev/demos without a full user table. Replace with a real `users`
-# table + hashed passwords (e.g. passlib/bcrypt) before shipping this to
-# more than one admin or to production.
 
 @router.post("/auth/login", response_model=TokenResponse)
 def login(payload: LoginSchema):
-    if payload.email != settings.ADMIN_EMAIL or payload.password != settings.ADMIN_PASSWORD:
+    if payload.email != settings.ADMIN_EMAIL:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not pwd_context.verify(payload.password, settings.ADMIN_PASSWORD_HASH):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
@@ -80,7 +86,7 @@ def login(payload: LoginSchema):
 
 
 # ------------------------------------------------------------------
-# Moderation (HITL review queue) -- now actually protected
+# Moderation (HITL review queue)
 # ------------------------------------------------------------------
 
 @router.get("/pending-matches", dependencies=[Depends(require_admin)])
@@ -102,7 +108,7 @@ def get_pending_matches():
             """
         )
         rows = cursor.fetchall()
-    return {"status": "success", "count": len(rows), "data": rows}
+        return {"status": "success", "count": len(rows), "data": rows}
 
 
 @router.post("/review-match", dependencies=[Depends(require_admin)])
@@ -152,3 +158,70 @@ def review_match(decision: ReviewDecisionSchema):
         except Exception as e:
             conn.rollback()
             raise HTTPException(status_code=500, detail=f"Review failed: {e}")
+
+
+# ------------------------------------------------------------------
+# Compliance / Governance
+# ------------------------------------------------------------------
+
+@router.get("/compliance/settings", dependencies=[Depends(require_admin)])
+def get_compliance_settings():
+    """Returns current scraping governance configuration (non-sensitive)."""
+    return {
+        "scraping_enabled": settings.SCRAPING_ENABLED,
+        "enforce_robots_txt": settings.ENFORCE_ROBOTS_TXT,
+        "enforce_domain_allowlist": settings.ENFORCE_DOMAIN_ALLOWLIST,
+        "default_scrape_rpm": settings.DEFAULT_SCRAPE_RPM,
+        "scraper_user_agent": settings.SCRAPER_USER_AGENT,
+    }
+
+
+@router.post("/compliance/settings", dependencies=[Depends(require_admin)])
+def update_compliance_settings(payload: ComplianceToggleSchema):
+    """
+    Updates runtime compliance settings in Redis (not persisted to .env).
+    For permanent changes, edit .env and restart.
+    """
+    from app.db_sync import redis_client
+    # Store overrides in Redis; tasks read these at runtime
+    if payload.scraping_enabled is not None:
+        redis_client.set("cfg:scraping_enabled", "1" if payload.scraping_enabled else "0")
+    if payload.enforce_robots_txt is not None:
+        redis_client.set("cfg:enforce_robots_txt", "1" if payload.enforce_robots_txt else "0")
+    if payload.enforce_domain_allowlist is not None:
+        redis_client.set("cfg:enforce_domain_allowlist", "1" if payload.enforce_domain_allowlist else "0")
+    if payload.default_scrape_rpm is not None:
+        redis_client.set("cfg:default_scrape_rpm", str(payload.default_scrape_rpm))
+    return {"status": "success", "message": "Compliance settings updated in Redis. Restart workers to apply from env."}
+
+
+@router.get("/compliance/domains", dependencies=[Depends(require_admin)])
+def list_domain_compliance():
+    """List all vendors with their scraping compliance flags."""
+    with get_conn() as conn:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            """
+            SELECT id, name, domain, is_active, scraping_allowed, scrape_rpm,
+                   respects_robots_txt, title_selector, price_selector, stock_selector
+            FROM vendors
+            ORDER BY domain;
+            """
+        )
+        return {"status": "success", "data": cursor.fetchall()}
+
+
+@router.patch("/compliance/domains/{vendor_id}", dependencies=[Depends(require_admin)])
+def update_domain_compliance(vendor_id: str, scraping_allowed: bool, scrape_rpm: int):
+    with get_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE vendors
+            SET scraping_allowed = %s, scrape_rpm = %s, updated_at = NOW()
+            WHERE id = %s::uuid;
+            """,
+            (scraping_allowed, scrape_rpm, vendor_id),
+        )
+        conn.commit()
+    return {"status": "success", "message": f"Vendor {vendor_id} compliance updated."}

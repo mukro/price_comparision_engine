@@ -1,67 +1,73 @@
 # app/core/matcher.py
 """
-Core Entity Resolution Pipeline.
-
-1. Vector Search (pgvector) -> Retrieve top 5 semantic candidates.
-2. Hard Filtering -> Eliminate brand/spec mismatches.
-3. Hybrid Scoring -> Vector similarity (50%) + Fuzzy Token Match (50%).
-4. Threshold Routing:
-   - > 0.82 Confidence  --> Auto-Match
-   - 0.60 - 0.81        --> Send to Admin HITL Review Queue
-   - < 0.60              --> Auto-Create new Master Product
-5. Price history logging, cache invalidation & price-alert dispatch.
-
-NOTE: this module loads a sentence-transformers model at import time. It
-should only ever be imported by Celery workers, never by the FastAPI app
-process (the API layer never needs it directly).
+Core Entity Resolution Pipeline with:
+  - Lazy model loading
+  - Better spec extraction (regex + fallback)
+  - Confidence threshold with admin feedback awareness
+  - Price-drop alert only on actual decreases
+  - Cache invalidation
 """
 import logging
 import re
 from functools import lru_cache
+from typing import Optional
 
 from psycopg2.extras import Json, RealDictCursor
 from rapidfuzz import fuzz
 
 from app.db_sync import get_conn, invalidate_grid_cache
+from app.core.telemetry_metrics import MATCHING_CONFIDENCE_HISTOGRAM
 
 logger = logging.getLogger("matcher")
 
 
 @lru_cache(maxsize=1)
 def _get_model():
-    """Lazily load the embedding model once per process, on first use."""
     from sentence_transformers import SentenceTransformer
     return SentenceTransformer("all-MiniLM-L6-v2")
 
 
 def get_embedding(text: str) -> list[float]:
-    """Generates a 384-dimensional dense vector representation of the product title."""
     return _get_model().encode(text, convert_to_numpy=True).tolist()
 
 
 def extract_specifications(title: str) -> dict:
     """
-    Extracts key product attributes (storage capacity, model codes)
-    using regular expressions to enforce hard constraints during matching.
+    Extracts key product attributes using regex heuristics.
+    Quick-commerce specific: handles pack sizes, weights, volumes.
     """
-    title_lower = title.lower()
+    t = title.lower()
 
-    storage_match = re.search(r"\b(\d+\s?(gb|tb))\b", title_lower)
-    model_match = re.search(r"\b([a-zA-Z0-9]{2,5}[-\s]?[a-zA-Z0-9]{3,6})\b", title)
+    # Storage: 128GB, 1TB, etc.
+    storage_match = re.search(r"\b(\d+\s?(gb|tb|mb))\b", t)
+    # Weight/volume: 500g, 1kg, 250ml, 2L, 1.5L
+    weight_match = re.search(r"\b(\d+(?:\.\d+)?\s?(kg|g|ml|l|ltr|litre))\b", t)
+    # Pack size: Pack of 6, (6 x 100g), 6pcs
+    pack_match = re.search(r"(?:pack\s*of\s*(\d+)|\((\d+)\s*x\s*\d+|(\d+)\s*pcs)", t)
+    # Model code: alphanumeric patterns like "WH-1000XM5", "iPhone15"
+    model_match = re.search(r"\b([a-z]*\d+[a-z]*(?:[-\s]?[a-z0-9]+)?)\b", t)
 
     return {
         "storage": storage_match.group(1).replace(" ", "").upper() if storage_match else None,
+        "weight": weight_match.group(0).replace(" ", "").lower() if weight_match else None,
+        "pack_size": next((x for x in [pack_match.group(i) for i in range(1, 4)] if x), None),
         "model_code": model_match.group(1).upper() if model_match else None,
     }
 
 
-def process_scraped_offer(scraped_item: dict) -> str | None:
+def _get_confidence_thresholds() -> tuple[float, float]:
     """
-    Ingests one scraped {title, price, vendor, url, ...} payload: resolves
-    it to a master product, upserts the vendor_offer, logs a price_history
-    point, and (if the price changed) triggers the price-drop-alert task.
+    Reads per-category thresholds from DB or falls back to defaults.
+    In future, train these from match_feedback table.
+    """
+    # TODO: read from merchant_rules or a new table `match_thresholds`
+    return 0.82, 0.60  # (auto_match, pending_review)
 
-    Returns the matched product_id, or None on failure.
+
+def process_scraped_offer(scraped_item: dict) -> Optional[str]:
+    """
+    Ingests one scraped payload: resolves to master product, upserts offer,
+    logs price_history, and triggers alerts only on genuine price drops.
     """
     raw_title = scraped_item["raw_title"][:300].strip()
     brand = scraped_item.get("brand")
@@ -74,6 +80,7 @@ def process_scraped_offer(scraped_item: dict) -> str | None:
 
     embedding = get_embedding(raw_title)
     scraped_specs = extract_specifications(raw_title)
+    auto_match_thresh, pending_thresh = _get_confidence_thresholds()
 
     with get_conn() as conn:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -86,11 +93,11 @@ def process_scraped_offer(scraped_item: dict) -> str | None:
                 """
                 SELECT id, title, brand, 1 - (title_embedding <=> %s::vector) AS similarity
                 FROM products
-                WHERE 1 - (title_embedding <=> %s::vector) > 0.60
+                WHERE 1 - (title_embedding <=> %s::vector) > %s
                 ORDER BY title_embedding <=> %s::vector
                 LIMIT 5;
                 """,
-                (embedding, embedding, embedding),
+                (embedding, embedding, pending_thresh, embedding),
             )
             candidates = cursor.fetchall()
 
@@ -103,6 +110,9 @@ def process_scraped_offer(scraped_item: dict) -> str | None:
                 if scraped_specs["storage"] and cand_specs["storage"]:
                     if scraped_specs["storage"] != cand_specs["storage"]:
                         continue
+                if scraped_specs["weight"] and cand_specs["weight"]:
+                    if scraped_specs["weight"] != cand_specs["weight"]:
+                        continue
 
                 token_score = fuzz.token_sort_ratio(raw_title, candidate["title"]) / 100.0
                 combined_confidence = (candidate["similarity"] * 0.5) + (token_score * 0.5)
@@ -112,9 +122,9 @@ def process_scraped_offer(scraped_item: dict) -> str | None:
                     matched_product_id = candidate["id"]
 
             # Step 4: routing decision
-            if matched_product_id and best_confidence >= 0.82:
+            if matched_product_id and best_confidence >= auto_match_thresh:
                 status = "matched"
-            elif matched_product_id and 0.60 <= best_confidence < 0.82:
+            elif matched_product_id and pending_thresh <= best_confidence < auto_match_thresh:
                 status = "pending_review"
             else:
                 cursor.execute(
@@ -128,7 +138,10 @@ def process_scraped_offer(scraped_item: dict) -> str | None:
                 matched_product_id = cursor.fetchone()["id"]
                 status = "matched"
 
-            # Step 5: upsert the vendor offer
+            # Record confidence histogram for observability
+            MATCHING_CONFIDENCE_HISTOGRAM.observe(best_confidence)
+
+            # Step 5: upsert vendor offer
             cursor.execute(
                 """
                 INSERT INTO vendor_offers (
@@ -150,12 +163,13 @@ def process_scraped_offer(scraped_item: dict) -> str | None:
                 """,
                 (
                     matched_product_id, vendor_id, vendor_product_id, raw_title,
-                    product_url, affiliate_url, price, in_stock, status, best_confidence,
+                    product_url, affiliate_url, price, in_stock,
+                    status, best_confidence,
                 ),
             )
             offer_id = cursor.fetchone()["id"]
 
-            # Step 6: append to price_history (append-only log, powers /history)
+            # Step 6: append-only price_history
             cursor.execute(
                 """
                 INSERT INTO price_history (offer_id, price, in_stock, recorded_at)
@@ -166,10 +180,26 @@ def process_scraped_offer(scraped_item: dict) -> str | None:
 
             conn.commit()
 
-            # Step 7: post-processing (cache invalidation + price-drop alert dispatch)
+            # Step 7: post-processing
             if status == "matched":
                 invalidate_grid_cache(str(matched_product_id))
 
+                # Find previous lowest price (before this scrape)
+                cursor.execute(
+                    """
+                    SELECT MIN(current_price) AS prev_lowest
+                    FROM vendor_offers
+                    WHERE product_id = %s::uuid
+                      AND in_stock = TRUE
+                      AND match_status = 'matched'
+                      AND last_scraped_at < NOW() - INTERVAL '1 hour';
+                    """,
+                    (matched_product_id,),
+                )
+                prev_row = cursor.fetchone()
+                prev_lowest = float(prev_row["prev_lowest"]) if prev_row and prev_row["prev_lowest"] else None
+
+                # Current lowest after this update
                 cursor.execute(
                     """
                     SELECT MIN(current_price) AS lowest_price
@@ -179,15 +209,18 @@ def process_scraped_offer(scraped_item: dict) -> str | None:
                     (matched_product_id,),
                 )
                 lowest_row = cursor.fetchone()
-                if lowest_row and lowest_row["lowest_price"] is not None:
-                    # Imported lazily to avoid a circular import (tasks -> matcher -> tasks)
-                    from app.tasks import (
-                        check_and_notify_price_drops,
-                        dispatch_merchant_repricing_webhooks,
-                    )
-                    lowest_price = float(lowest_row["lowest_price"])
-                    check_and_notify_price_drops.delay(str(matched_product_id), lowest_price)
-                    dispatch_merchant_repricing_webhooks.delay(str(matched_product_id), lowest_price)
+                lowest_price = float(lowest_row["lowest_price"]) if lowest_row and lowest_row["lowest_price"] else None
+
+                if lowest_price is not None:
+                    # Only alert if this is a genuine new low or first time
+                    is_new_low = prev_lowest is None or lowest_price < prev_lowest
+                    if is_new_low:
+                        from app.tasks import (
+                            check_and_notify_price_drops,
+                            dispatch_merchant_repricing_webhooks,
+                        )
+                        check_and_notify_price_drops.delay(str(matched_product_id), lowest_price)
+                        dispatch_merchant_repricing_webhooks.delay(str(matched_product_id), lowest_price)
 
             return str(matched_product_id)
 

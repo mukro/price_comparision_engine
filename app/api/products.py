@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, HTTPException, Path, Query, Request
 from pydantic import BaseModel
 
 from app import cache
@@ -82,6 +82,8 @@ async def search_products(
 
     pool = get_db_pool()
     async with pool.acquire() as conn:
+        # Use ILIKE with wildcards for partial brand/model matching
+        pattern = f"%{q}%"
         rows = await conn.fetch(
             """
             SELECT
@@ -92,12 +94,14 @@ async def search_products(
                 similarity(p.title, $1) AS score
             FROM products p
             LEFT JOIN vendor_offers vo ON p.id = vo.product_id AND vo.in_stock = TRUE
-            WHERE p.title % $1 OR p.brand ILIKE $1 OR p.model_code ILIKE $1
+            WHERE p.title % $1
+               OR p.brand ILIKE $4
+               OR p.model_code ILIKE $4
             GROUP BY p.id
             ORDER BY score DESC, lowest_price ASC NULLS LAST
             LIMIT $2 OFFSET $3;
             """,
-            q, limit, offset,
+            q, limit, offset, pattern,
         )
 
     results = [
@@ -190,7 +194,7 @@ async def get_price_history(
             FROM price_history ph
             JOIN vendor_offers vo ON ph.offer_id = vo.id
             WHERE vo.product_id = $1::uuid
-                AND ph.recorded_at >= NOW() - ($2 || ' days')::interval
+              AND ph.recorded_at >= NOW() - ($2 || ' days')::interval
             ORDER BY ph.recorded_at ASC;
             """,
             product_id, str(days),
@@ -207,8 +211,8 @@ async def get_price_history(
 
 
 @router.get("/{product_id}/insights", response_model=Dict[str, Any])
-def get_product_buying_insights(product_id: str):
-    """[USP] Real-time 'BUY_NOW' vs 'WAIT' recommendation backed by 90-day price history."""
+async def get_product_buying_insights(product_id: str):
+    """Real-time BUY_NOW vs WAIT recommendation backed by 90-day price history."""
     try:
         insights = calculate_buy_timing_recommendation(product_id)
         return {"status": "success", "data": insights}
@@ -217,8 +221,8 @@ def get_product_buying_insights(product_id: str):
 
 
 @router.get("/{product_id}/alternatives", response_model=Dict[str, Any])
-def get_cheaper_feature_alternatives(product_id: str, limit: int = Query(default=3, le=10)):
-    """[USP] Vector similarity search for cheaper, spec-equivalent cross-brand alternatives."""
+async def get_cheaper_feature_alternatives(product_id: str, limit: int = Query(default=3, le=10)):
+    """Vector similarity search for cheaper, spec-equivalent cross-brand alternatives."""
     try:
         alternatives = find_feature_equivalent_alternatives(product_id, limit=limit)
         return {"status": "success", "count": len(alternatives), "data": alternatives}

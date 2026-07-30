@@ -1,12 +1,7 @@
 # app/db_sync.py
 """
-Synchronous, pooled database + cache access for Celery tasks and
-`app/core/*` business logic.
-
-Previously every function in matcher.py / dynamic_pricing.py / insights.py /
-telemetry.py opened a brand-new `psycopg2.connect()` per call, which
-exhausts Postgres connections quickly under Celery concurrency. This module
-provides one process-wide connection pool instead.
+Synchronous, pooled database + cache access for Celery tasks and core logic.
+Adds connection timeouts and health-checks.
 """
 import logging
 
@@ -22,20 +17,23 @@ _pg_pool = pg_pool.ThreadedConnectionPool(
     minconn=2,
     maxconn=20,
     dsn=settings.DATABASE_URL,
+    connect_timeout=10,
+    options="-c statement_timeout=30000",  # 30s query timeout
 )
 
-redis_client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+redis_client = redis.Redis.from_url(
+    settings.REDIS_URL,
+    decode_responses=True,
+    socket_connect_timeout=5,
+    socket_timeout=5,
+    health_check_interval=30,
+)
 
 
 class get_conn:
     """
     Context manager that borrows a pooled psycopg2 connection and always
     returns it to the pool, rolling back on error.
-
-        with get_conn() as conn:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            cursor.execute(...)
-            conn.commit()
     """
 
     def __enter__(self) -> psycopg2.extensions.connection:
