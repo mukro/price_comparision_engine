@@ -69,3 +69,24 @@ Use the returned `access_token` as `Authorization: Bearer <token>` on `/api/v1/a
 - `app/frontend/arch_summary.txt` mentions OpenAI embeddings; the actual (and rebuilt) implementation uses local `sentence-transformers` (`all-MiniLM-L6-v2`), matching the `vector(384)` column -- that doc was aspirational/stale, not a bug in code.
 - The single-admin login (`ADMIN_EMAIL`/`ADMIN_PASSWORD` in settings) is dev/demo-grade. Before real use, replace with a proper `users` table, hashed passwords, and per-merchant scoped auth for the `/merchant/*` routes (right now any admin can see/edit any merchant's rules).
 - Legal/scraping-compliance posture (honest User-Agent, no stealth evasion) -- see the audit doc; still recommend a robots.txt check and per-domain rate limiting before scraping vendors at scale, and legal review of your vendor list.
+
+# 1. Setup
+git clone https://github.com/mukro/price_comparision_engine.git
+cd price_comparision_engine
+unzip price_engine_v2_improvements.zip -d ./
+cp .env.example .env
+# Edit .env
+
+# 2. Build & Run
+docker compose up -d
+
+# 3. Migrate
+docker compose exec -T db psql -U price_engine -d price_comparison < scripts/migrate_v1_to_v2.sql
+
+# 4. Verify
+curl http://localhost:8000/health
+curl http://localhost:8000/docs
+
+# 5. Test
+pytest tests/test_compliance.py -v
+locust -f tests/load/locustfile.py --host=http://localhost:8000
