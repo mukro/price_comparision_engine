@@ -1,160 +1,240 @@
 version: "3.8"
 
 services:
-  # ==========================================
-  # 1. POSTGRESQL + PGVECTOR DATABASE
-  # ==========================================
-  db:
-    image: pgvector/pgvector:pg16
-    container_name: price_db
-    restart: always
-    env_file: .env
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "127.0.0.1:5432:5432"  # Bind to localhost only; use VPN/SSH tunnel for remote access
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - app_network
+ # ==========================================
+ # 1. POSTGRESQL + PGVECTOR DATABASE
+ # ==========================================
+ db:
+   image: pgvector/pgvector:pg16
+   container_name: price_db
+   restart: always
+   env_file: .env
+   environment:
+     POSTGRES_DB: ${POSTGRES_DB}
+     POSTGRES_USER: ${POSTGRES_USER}
+     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+   ports:
+     - "127.0.0.1:5432:5432"
+   volumes:
+     - pgdata:/var/lib/postgresql/data
+     - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+     - ./app/db/schema.sql:/docker-entrypoint-initdb.d/02_schema.sql
+     - ./monetization_foundation_v1.sql:/docker-entrypoint-initdb.d/03_monetization.sql
+   healthcheck:
+     test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+     interval: 5s
+     timeout: 5s
+     retries: 5
+   networks:
+     - app_network
 
-  # ==========================================
-  # 2. REDIS (Cache & Celery Broker)
-  # ==========================================
-  redis:
-    image: redis:7-alpine
-    container_name: price_redis
-    restart: always
-    env_file: .env
-    command: >
-      sh -c "redis-server --requirepass $${REDIS_PASSWORD} --bind 0.0.0.0"
-    # DO NOT expose Redis to host in production. Internal-only via Docker network.
-    # ports:
-    #   - "6379:6379"
-    volumes:
-      - redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "$${REDIS_PASSWORD}", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - app_network
+ # ==========================================
+ # 2. REDIS (Cache, Celery Broker, Rate Limiting)
+ # ==========================================
+ redis:
+   image: redis:7-alpine
+   container_name: price_redis
+   restart: always
+   env_file: .env
+   command: >
+     sh -c "redis-server --requirepass $${REDIS_PASSWORD} --bind 0.0.0.0 --maxmemory 256mb --maxmemory-policy allkeys-lru"
+   # DO NOT expose Redis to host in production. Internal-only via Docker network.
+   # ports:
+   #   - "6379:6379"
+   volumes:
+     - redisdata:/data
+   healthcheck:
+     test: ["CMD", "redis-cli", "-a", "$${REDIS_PASSWORD}", "ping"]
+     interval: 5s
+     timeout: 5s
+     retries: 5
+   networks:
+     - app_network
 
-  # ==========================================
-  # 3. FASTAPI API SERVER
-  # ==========================================
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: price_api
-    restart: always
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    ports:
-      - "8000:8000"
-    env_file: .env
-    volumes:
-      - .:/app
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - app_network
+ # ==========================================
+ # 3. FASTAPI API SERVER
+ # ==========================================
+ api:
+   build:
+     context: .
+     dockerfile: Dockerfile
+   container_name: price_api
+   restart: always
+   command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   ports:
+     - "8000:8000"
+   env_file: .env
+   environment:
+     - PYTHONUNBUFFERED=1
+   volumes:
+     - .:/app
+   depends_on:
+     db:
+       condition: service_healthy
+     redis:
+       condition: service_healthy
+   healthcheck:
+     test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+     interval: 30s
+     timeout: 10s
+     retries: 3
+     start_period: 10s
+   networks:
+     - app_network
 
-  # ==========================================
-  # 4. CELERY WORKER (Scraping & Matching)
-  # ==========================================
-  celery_worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: price_celery_worker
-    restart: always
-    command: celery -A app.celery_app:celery_app worker --loglevel=info --concurrency=4
-    env_file: .env
-    volumes:
-      - .:/app
-      - model_cache:/root/.cache  # Persist sentence-transformers model
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - app_network
+ # ==========================================
+ # 4. CELERY WORKER — Default Queue
+ #     (Scraping, emails, budget resets, click archiving)
+ # ==========================================
+ celery_worker:
+   build:
+     context: .
+     dockerfile: Dockerfile
+   container_name: price_celery_worker
+   restart: always
+   command: >
+     celery -A app.celery_app:celery_app worker
+     -Q default
+     --loglevel=info
+     --concurrency=4
+     -n worker_default@%h
+   env_file: .env
+   environment:
+     - PYTHONUNBUFFERED=1
+   volumes:
+     - .:/app
+     - model_cache:/root/.cache
+   depends_on:
+     db:
+       condition: service_healthy
+     redis:
+       condition: service_healthy
+   networks:
+     - app_network
 
-  # ==========================================
-  # 5. CELERY BEAT (Periodic Task Scheduler)
-  # ==========================================
-  celery_beat:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: price_celery_beat
-    restart: always
-    command: celery -A app.celery_app:celery_app beat --loglevel=info
-    env_file: .env
-    volumes:
-      - .:/app
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - app_network
+ # ==========================================
+ # 5. CELERY WORKER — High Priority Queue
+ #     (Push notifications, real-time partner feed processing)
+ # ==========================================
+ celery_worker_priority:
+   build:
+     context: .
+     dockerfile: Dockerfile
+   container_name: price_celery_worker_priority
+   restart: always
+   command: >
+     celery -A app.celery_app:celery_app worker
+     -Q high_priority
+     --loglevel=info
+     --concurrency=2
+     -n worker_priority@%h
+   env_file: .env
+   environment:
+     - PYTHONUNBUFFERED=1
+   volumes:
+     - .:/app
+   depends_on:
+     db:
+       condition: service_healthy
+     redis:
+       condition: service_healthy
+   networks:
+     - app_network
 
-  # ==========================================
-  # 6. PROMETHEUS + GRAFANA (Monitoring)
-  # ==========================================
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: price_prometheus
-    restart: always
-    ports:
-      - "127.0.0.1:9090:9090"
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - promdata:/prometheus
-    depends_on:
-      - api
-    networks:
-      - app_network
+ # ==========================================
+ # 6. CELERY BEAT (Periodic Task Scheduler)
+ # ==========================================
+ celery_beat:
+   build:
+     context: .
+     dockerfile: Dockerfile
+   container_name: price_celery_beat
+   restart: always
+   command: celery -A app.celery_app:celery_app beat --loglevel=info
+   env_file: .env
+   environment:
+     - PYTHONUNBUFFERED=1
+   volumes:
+     - .:/app
+     - celery_beat_data:/app/celerybeat
+   depends_on:
+     db:
+       condition: service_healthy
+     redis:
+       condition: service_healthy
+   networks:
+     - app_network
 
-  grafana:
-    image: grafana/grafana:latest
-    container_name: price_grafana
-    restart: always
-    ports:
-      - "127.0.0.1:3000:3000"
-    env_file: .env
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
-    volumes:
-      - grafanadata:/var/lib/grafana
-    depends_on:
-      - prometheus
-    networks:
-      - app_network
+ # ==========================================
+ # 7. FLOWER — Celery Monitoring Dashboard
+ #     (Optional: monitor task queues, retry failed tasks)
+ #     Access: http://localhost:5555
+ # ==========================================
+ flower:
+   build:
+     context: .
+     dockerfile: Dockerfile
+   container_name: price_flower
+   restart: always
+   command: >
+     celery -A app.celery_app:celery_app flower
+     --port=5555
+     --basic-auth=${FLOWER_USER}:${FLOWER_PASSWORD}
+   env_file: .env
+   ports:
+     - "127.0.0.1:5555:5555"
+   depends_on:
+     - redis
+   networks:
+     - app_network
+
+ # ==========================================
+ # 8. PROMETHEUS (Metrics Collection)
+ # ==========================================
+ prometheus:
+   image: prom/prometheus:latest
+   container_name: price_prometheus
+   restart: always
+   ports:
+     - "127.0.0.1:9090:9090"
+   volumes:
+     - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+     - promdata:/prometheus
+   depends_on:
+     - api
+   networks:
+     - app_network
+
+ # ==========================================
+ # 9. GRAFANA (Metrics Visualization)
+ # ==========================================
+ grafana:
+   image: grafana/grafana:latest
+   container_name: price_grafana
+   restart: always
+   ports:
+     - "127.0.0.1:3000:3000"
+   env_file: .env
+   environment:
+     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+     - GF_USERS_ALLOW_SIGN_UP=false
+   volumes:
+     - grafanadata:/var/lib/grafana
+     - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+     - ./grafana/datasources:/etc/grafana/provisioning/datasources
+   depends_on:
+     - prometheus
+   networks:
+     - app_network
 
 volumes:
-  pgdata:
-  redisdata:
-  promdata:
-  grafanadata:
-  model_cache:
+ pgdata:
+ redisdata:
+ promdata:
+ grafanadata:
+ model_cache:
+ celery_beat_data:
 
 networks:
-  app_network:
-    driver: bridge
+ app_network:
+   driver: bridge

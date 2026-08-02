@@ -24,18 +24,21 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Header, Request, status
-from pydantic import BaseModel, Field, validator
-from psycopg2.extras import RealDictCursor
-
 from app.config import settings
-from app.db_sync import get_conn
 from app.core.compliance import get_domain_from_url
+from app.db_sync import get_conn
+
+# In your existing OCR endpoint, add:
+from app.ml.ocr_intelligence import OCRIntelligence
+from fastapi import APIRouter, Header, HTTPException, Request, status
+from psycopg2.extras import RealDictCursor
+from pydantic import BaseModel, Field, validator
 
 logger = logging.getLogger("ocr_submission")
 
 router = APIRouter(prefix="/api/v1/submissions", tags=["User OCR Submissions"])
 
+ocr_ai = OCRIntelligence()
 
 # ==========================================
 # Schemas
@@ -333,7 +336,7 @@ def submit_ocr_data(payload: OCRSubmissionSchema, request: Request):
 
 def _merge_submission_to_offers(cursor, submission_id: str, payload: OCRSubmissionSchema):
     """Merge an approved OCR submission into the main vendor_offers table."""
-    from app.core.matcher import get_embedding, extract_specifications
+    from app.core.matcher import extract_specifications, get_embedding
 
     # Resolve or create vendor
     cursor.execute(
@@ -486,6 +489,51 @@ def get_contributor_leaderboard(geo_hash: Optional[str] = None, limit: int = 50)
         cursor.execute(query, params)
         return {"status": "success", "data": cursor.fetchall()}
 
+#==============================
+#OCR end point with AI extraction, auto-matching, and fraud detection
+#==============================
+
+
+@router.app.post("/api/v1/ocr/submit")
+async def submit_ocr(payload: OCRSubmissionSchema):
+    # ... existing code ...
+
+    # NEW: AI extraction
+    extracted = await ocr_ai.extract_from_ocr(payload.raw_text)
+
+    # NEW: Auto-match to catalog
+    match_result = await ocr_ai.match_to_catalog(extracted)
+
+    # NEW: Fraud detection
+    fraud_check = await ocr_ai.detect_fraud({
+        "device_hash": payload.device_hash,
+        "price": extracted.get("price"),
+        "product_id": match_result.get("product_id"),
+        "raw_text": payload.raw_text,
+    })
+
+    if fraud_check["is_fraudulent"]:
+        return {"status": "rejected", "reason": fraud_check["flags"]}
+
+    # Store with AI-enriched data
+    await conn.execute(
+        """
+        INSERT INTO ocr_submissions 
+        (device_hash, product_name, brand, price, currency, ocr_confidence, 
+         matched_product_id, ai_extracted_data, fraud_score, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+        """,
+        payload.device_hash,
+        extracted.get("product_name"),
+        extracted.get("brand"),
+        extracted.get("price"),
+        extracted.get("currency"),
+        extracted.get("confidence"),
+        match_result.get("product_id"),
+        json.dumps(extracted),
+        fraud_check["risk_score"],
+        "approved" if fraud_check["recommendation"] == "approve" else "pending",
+    )
 
 # ==========================================
 # Community Validation (voting)

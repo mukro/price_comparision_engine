@@ -1,0 +1,47 @@
+# 1. Copy env template
+cp .env.example .env
+
+# 2. Edit .env with your real values (especially passwords and API keys)
+
+# 3. Place the schema migration in your repo root
+cp monetization_foundation_v1.sql ./
+
+# 4. Build and start everything
+docker compose up --build -d
+
+# 5. Verify all services are healthy
+docker compose ps
+
+# 6. Check logs
+docker compose logs -f api
+docker compose logs -f celery_worker
+docker compose logs -f celery_worker_priority
+
+# 7. Access dashboards
+# API Docs:    http://localhost:8000/docs
+# Grafana:     http://localhost:3000  (admin / $GRAFANA_ADMIN_PASSWORD)
+# Prometheus:  http://localhost:9090
+# Flower:      http://localhost:5555  ($FLOWER_USER / $FLOWER_PASSWORD)
+
+
+Before going live:
+Remove --reload from API command in docker-compose.yml — it's for dev only
+Bind Redis to localhost only — already done (# ports: commented out), but verify
+Generate real JWT_SECRET_KEY — openssl rand -hex 32
+Generate real bcrypt hash for admin — python -c "from passlib.hash import bcrypt; print(bcrypt.hash('yourpassword'))"
+Set up Firebase project and paste FCM_SERVER_KEY into .env
+Run the schema migration — either auto-mount (first boot) or manually:
+bash
+
+docker compose exec db psql -U $POSTGRES_USER -d $POSTGRES_DB -f /docker-entrypoint-initdb.d/03_monetization.sql
+Create your first partner API key via admin endpoint after startup:
+bash
+
+curl -X POST http://localhost:8000/api/v1/admin/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@yourdomain.com","password":"yourpassword"}'
+# Use token to create partner key:
+curl -X POST http://localhost:8000/api/v1/partners/keys \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"merchant_id":"amazon_in","name":"Amazon India Production"}'
