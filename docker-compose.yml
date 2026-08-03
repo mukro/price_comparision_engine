@@ -226,6 +226,30 @@ services:
      - prometheus
    networks:
      - app_network
+     
+==========================
+AI pce_agent_orchestrator
+==========================
+#  agent_orchestrator:
+#    build:
+#      context: ./agents
+#      dockerfile: Dockerfile
+#    container_name: pce_agent_orchestrator
+#    restart: unless-stopped
+#    env_file: .env
+#    environment:
+#      - OPENAI_API_KEY=${OPENAI_API_KEY}
+#      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+#    volumes:
+#      - ./agents/prompts:/app/prompts
+#      - ./agents/tools:/app/tools
+#    depends_on:
+#      - api
+#      - db
+#      - redis
+#    networks:
+#      - app_network
+
 
 volumes:
  pgdata:

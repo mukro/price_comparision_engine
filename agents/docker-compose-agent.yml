@@ -1,0 +1,40 @@
+# ============================================
+# Add this service block to your main docker-compose.yml
+# ============================================
+
+  agent_orchestrator:
+    build:
+      context: ./agents
+      dockerfile: Dockerfile
+    container_name: pce_agent_orchestrator
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - PYTHONUNBUFFERED=1
+      - AGENT_BATCH_SIZE=50
+      - AGENT_MODE=full
+    volumes:
+      - ./agents:/app
+      - agent_logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app_network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+    # Run in loop mode: checks every 5 minutes
+    command: python -m agent.main full --loop --interval 300 --batch-size 50
+
+# Add to volumes section:
+# agent_logs:
