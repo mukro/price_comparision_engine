@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PCE Admin Panel</title>
+  <link rel="stylesheet" href="admin.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <!-- Login Screen -->
+    <div id="login-view" class="view active">
+      <div class="login-card">
+        <div class="login-icon">🔧</div>
+        <h1>Admin Portal</h1>
+        <p class="login-subtitle">Price Comparison Engine — Operations Dashboard</p>
+        <form id="login-form">
+          <div class="field-group">
+            <label>Email</label>
+            <input type="email" id="login-email" placeholder="admin@yourdomain.com" required>
+          </div>
+          <div class="field-group">
+            <label>Password</label>
+            <input type="password" id="login-password" placeholder="••••••••" required>
+          </div>
+          <div id="login-error" class="error-banner hidden"></div>
+          <button type="submit" id="login-btn" class="btn-primary">
+            <span class="btn-text">Sign In</span>
+            <span class="btn-spinner hidden">⟳</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard-view" class="view">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="brand-icon">⚡</div>
+          <div class="brand-text">PCE Admin</div>
+        </div>
+        <nav class="sidebar-nav">
+          <a href="#" class="nav-item active" data-page="review">
+            <span class="nav-icon">📋</span>
+            <span>Review Queue</span>
+            <span id="badge-review" class="nav-badge hidden">0</span>
+          </a>
+          <a href="#" class="nav-item" data-page="compliance">
+            <span class="nav-icon">⚖️</span>
+            <span>Compliance</span>
+          </a>
+          <a href="#" class="nav-item" data-page="domains">
+            <span class="nav-icon">🌐</span>
+            <span>Domains</span>
+          </a>
+          <a href="#" class="nav-item" data-page="system">
+            <span class="nav-icon">📊</span>
+            <span>System</span>
+          </a>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="user-pill">
+            <span id="user-email">admin</span>
+            <button id="logout-btn" class="btn-ghost" title="Logout">🚪</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Content Area -->
+      <main class="main-content">
+        <!-- Top Bar -->
+        <header class="top-bar">
+          <h2 id="page-title">Review Queue</h2>
+          <div class="top-actions">
+            <button id="refresh-btn" class="btn-ghost" title="Refresh">🔄</button>
+            <div class="api-status" id="api-status">
+              <span class="status-dot online"></span>
+              <span class="status-text">Online</span>
+            </div>
+          </div>
+        </header>
+
+        <!-- Pages -->
+        <div class="page-container">
+          <!-- Review Queue Page -->
+          <div id="page-review" class="page active">
+            <div class="toolbar">
+              <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="review-search" placeholder="Search vendor or product...">
+              </div>
+              <div class="toolbar-actions">
+                <button id="bulk-approve-btn" class="btn-success" disabled>
+                  ✓ Approve Selected
+                </button>
+                <button id="bulk-reject-btn" class="btn-danger" disabled>
+                  ✕ Reject Selected
+                </button>
+              </div>
+            </div>
+            <div id="review-empty" class="empty-state hidden">
+              <div class="empty-icon">✅</div>
+              <h3>Queue is Clear</h3>
+              <p>All pending matches have been reviewed.</p>
+            </div>
+            <div id="review-list" class="review-list"></div>
+          </div>
+
+          <!-- Compliance Page -->
+          <div id="page-compliance" class="page">
+            <div class="compliance-grid">
+              <div class="panel">
+                <h3>Scraping Governance</h3>
+                <div class="toggle-list">
+                  <label class="toggle-row">
+                    <span class="toggle-label">
+                      <strong>Master Scraping Switch</strong>
+                      <span class="toggle-desc">Enable/disable all scraping tasks globally</span>
+                    </span>
+                    <label class="switch">
+                      <input type="checkbox" id="toggle-scraping">
+                      <span class="slider"></span>
+                    </label>
+                  </label>
+                  <label class="toggle-row">
+                    <span class="toggle-label">
+                      <strong>Enforce robots.txt</strong>
+                      <span class="toggle-desc">Abort scrape if robots.txt disallows</span>
+                    </span>
+                    <label class="switch">
+                      <input type="checkbox" id="toggle-robots">
+                      <span class="slider"></span>
+                    </label>
+                  </label>
+                  <label class="toggle-row">
+                    <span class="toggle-label">
+                      <strong>Domain Allowlist</strong>
+                      <span class="toggle-desc">Only scrape explicitly allow-listed domains</span>
+                    </span>
+                    <label class="switch">
+                      <input type="checkbox" id="toggle-allowlist">
+                      <span class="slider"></span>
+                    </label>
+                  </label>
+                </div>
+              </div>
+              <div class="panel">
+                <h3>Rate Limits</h3>
+                <div class="field-group">
+                  <label>Default Scrape RPM (requests per minute)</label>
+                  <input type="number" id="input-rpm" min="1" max="120" value="6">
+                  <span class="field-hint">Recommended: 6 for polite scraping, 30 for aggressive</span>
+                </div>
+                <button id="save-compliance-btn" class="btn-primary">Save Settings</button>
+                <div id="compliance-toast" class="toast hidden"></div>
+              </div>
+              <div class="panel panel-wide">
+                <h3>Current Configuration</h3>
+                <pre id="compliance-json" class="code-block">Loading...</pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Domains Page -->
+          <div id="page-domains" class="page">
+            <div class="toolbar">
+              <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="domain-search" placeholder="Search domain or vendor...">
+              </div>
+            </div>
+            <div class="table-container">
+              <table class="data-table" id="domains-table">
+                <thead>
+                  <tr>
+                    <th>Vendor</th>
+                    <th>Domain</th>
+                    <th>Active</th>
+                    <th>Scraping</th>
+                    <th>RPM</th>
+                    <th>robots.txt</th>
+                    <th>Selectors</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="domains-tbody">
+                  <tr><td colspan="8" class="table-loading">Loading domains...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- System Page -->
+          <div id="page-system" class="page">
+            <div class="system-grid">
+              <div class="panel">
+                <h3>API Health</h3>
+                <div id="health-api" class="health-card">
+                  <span class="health-status loading">Checking...</span>
+                </div>
+              </div>
+              <div class="panel">
+                <h3>Agent Orchestrator</h3>
+                <div id="health-agents" class="health-card">
+                  <span class="health-status loading">Checking...</span>
+                </div>
+              </div>
+              <div class="panel panel-wide">
+                <h3>Raw Health Response</h3>
+                <pre id="health-raw" class="code-block">Loading...</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

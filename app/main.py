@@ -21,6 +21,7 @@ from app.api import (
 )
 from app.config import settings
 from app.core.telemetry_metrics import setup_prometheus_metrics
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(
     title="Price Comparison Engine API",
@@ -54,6 +55,10 @@ async def shutdown():
     await db.close_db_pool()
     await db.close_redis()
 
+# ------------------------------------------------------------------
+# Admin Panel (static files)
+# ------------------------------------------------------------------
+app.mount("/admin", StaticFiles(directory="app/frontend/admin", html=True), name="admin")
 
 # ------------------------------------------------------------------
 # API Routers (order matters for path resolution)

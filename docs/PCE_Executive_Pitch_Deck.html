@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PCE Executive Pitch Deck</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0f0f12;
+    --surface: #1a1a20;
+    --surface-elevated: #24242c;
+    --border: rgba(255,255,255,0.06);
+    --text-primary: #f0f0f5;
+    --text-secondary: #a0a0b0;
+    --text-muted: #6b6b7b;
+    --accent: #00d4aa;
+    --accent-dim: rgba(0,212,170,0.12);
+    --accent-glow: rgba(0,212,170,0.25);
+    --danger: #ff6b6b;
+    --warning: #f0c040;
+    --positive: #00d4aa;
+    --purple: #7b61ff;
+    --purple-dim: rgba(123,97,255,0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  .deck-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  .slide {
+    display: none;
+    flex: 1;
+    padding: 36px 44px;
+    animation: fadeIn 0.5s ease-out;
+    overflow-y: auto;
+  }
+  .slide.active { display: flex; flex-direction: column; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .slide-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .slide-number {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .slide-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+
+  .slide-subtitle {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+    margin-top: 20px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    transition: all 0.25s ease;
+  }
+  .card:hover {
+    border-color: var(--accent-glow);
+    transform: translateY(-2px);
+  }
+
+  .card-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+
+  .card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+
+  .card-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  .tag-accent { background: var(--accent-dim); color: var(--accent); }
+  .tag-revenue { background: var(--purple-dim); color: #a78bfa; }
+  .tag-ai { background: rgba(240,192,64,0.12); color: var(--warning); }
+  .tag-live { background: var(--accent-dim); color: var(--positive); }
+
+  .metric-row {
+    display: flex;
+    gap: 16px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+
+  .metric {
+    flex: 1;
+    min-width: 140px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+  }
+
+  .metric-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .metric-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .timeline {
+    position: relative;
+    margin-top: 20px;
+    padding-left: 24px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--accent), transparent);
+    border-radius: 2px;
+  }
+
+  .timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+    padding-left: 18px;
+  }
+
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -22px;
+    top: 3px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+
+  .timeline-item.past::before { background: var(--text-muted); box-shadow: 0 0 0 3px rgba(107,107,123,0.2); }
+  .timeline-item.current::before { background: var(--warning); box-shadow: 0 0 0 3px rgba(240,192,64,0.2); animation: pulse 2s infinite; }
+
+  .timeline-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .timeline-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .timeline-desc { font-size: 12px; color: var(--text-secondary); margin-top: 5px; line-height: 1.5; }
+
+  .revenue-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 10px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .revenue-bar-fill {
+    flex: 1;
+    height: 7px;
+    background: var(--surface-elevated);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .revenue-bar-inner {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s ease-out;
+  }
+
+  .revenue-amount {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 70px;
+    text-align: right;
+  }
+
+  .revenue-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    min-width: 130px;
+  }
+
+  .usp-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin-top: 20px;
+  }
+
+  .usp-item {
+    display: flex;
+    gap: 14px;
+    padding: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+
+  .usp-number {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .usp-content h4 { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 3px; }
+  .usp-content p { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+
+  .tech-stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .tech-pill {
+    padding: 6px 12px;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  .hero-section {
+    text-align: center;
+    padding: 48px 16px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-glow);
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 20px;
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .hero-title {
+    font-size: 38px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.1;
+    margin-bottom: 14px;
+  }
+
+  .hero-title span {
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-subtitle {
+    font-size: 16px;
+    color: var(--text-secondary);
+    max-width: 520px;
+    line-height: 1.55;
+    margin-bottom: 32px;
+  }
+
+  .hero-stats {
+    display: flex;
+    gap: 32px;
+    margin-top: 16px;
+  }
+
+  .hero-stat-value { font-size: 24px; font-weight: 700; color: var(--accent); }
+  .hero-stat-label { font-size: 11px; color: var(--text-muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .problem-visual {
+    display: flex;
+    gap: 16px;
+    margin-top: 28px;
+    align-items: stretch;
+  }
+
+  .problem-card {
+    flex: 1;
+    padding: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    text-align: center;
+  }
+
+  .problem-card .emoji { font-size: 36px; margin-bottom: 14px; display: block; }
+  .problem-card h3 { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+  .problem-card p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
+  .arrow-connector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    font-size: 20px;
+    font-weight: bold;
+  }
+
+  .solution-banner {
+    background: linear-gradient(135deg, var(--accent-dim), var(--purple-dim));
+    border: 1px solid var(--accent-glow);
+    border-radius: 10px;
+    padding: 20px 28px;
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .solution-banner .icon {
+    width: 44px;
+    height: 44px;
+    background: var(--accent);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  .solution-banner h3 { font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 3px; }
+  .solution-banner p { font-size: 13px; color: var(--text-secondary); }
+
+  .feature-showcase {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  .feature-list {
+    list-style: none;
+    margin-top: 10px;
+  }
+
+  .feature-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+  }
+  .feature-list li:last-child { border-bottom: none; }
+  .feature-list .check { color: var(--accent); font-weight: bold; flex-shrink: 0; margin-top: 1px; }
+
+  .roi-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+    font-size: 12px;
+  }
+
+  .roi-table th {
+    text-align: left;
+    padding: 10px 14px;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .roi-table td {
+    padding: 12px 14px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .roi-table tr:hover td { background: var(--surface-elevated); }
+  .roi-table .highlight { color: var(--accent); font-weight: 600; }
+
+  .bottom-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 44px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+
+  .nav-btn {
+    padding: 9px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-elevated);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .nav-btn:hover { border-color: var(--accent-glow); background: var(--accent-dim); }
+  .nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .nav-dots { display: flex; gap: 6px; }
+
+  .nav-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .nav-dot.active { background: var(--accent); border-color: var(--accent); width: 20px; border-radius: 4px; }
+
+  .progress-bar { height: 2px; background: var(--surface-elevated); }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); transition: width 0.35s ease; border-radius: 2px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
+
+  .info-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .info-box h4 { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 10px; display: flex; align-items: center; gap: 7px; }
+  .info-box p, .info-box li { font-size: 12px; color: var(--text-secondary); line-height: 1.55; }
+  .info-box ul { list-style: none; padding: 0; margin-top: 8px; }
+  .info-box li { padding: 3px 0; padding-left: 14px; position: relative; }
+  .info-box li::before { content: '—'; position: absolute; left: 0; color: var(--accent); }
+
+  .phase-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 14px;
+  }
+  .phase-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .phase-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .phase-duration { font-size: 11px; color: var(--text-muted); background: var(--surface-elevated); padding: 3px 10px; border-radius: 5px; }
+  .phase-cost { font-size: 18px; font-weight: 700; color: var(--accent); margin-bottom: 10px; }
+  .phase-items { display: flex; flex-wrap: wrap; gap: 6px; }
+  .phase-item { padding: 5px 10px; background: var(--surface-elevated); border-radius: 5px; font-size: 11px; color: var(--text-secondary); }
+
+  .ai-feature {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-top: 10px;
+  }
+  .ai-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent-dim), var(--purple-dim));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .ai-content h4 { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 3px; }
+  .ai-content p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
+  @media (max-width: 768px) {
+    .slide { padding: 20px; }
+    .hero-title { font-size: 28px; }
+    .usp-grid, .feature-showcase, .two-col { grid-template-columns: 1fr; }
+    .problem-visual { flex-direction: column; }
+    .arrow-connector { transform: rotate(90deg); padding: 8px 0; }
+    .metric-row { flex-direction: column; }
+    .bottom-nav { padding: 12px 20px; }
+    .hero-stats { gap: 20px; flex-wrap: wrap; justify-content: center; }
+  }
+</style>
+</head>
+<body>
+<div class="deck-container">
+  <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:7.7%"></div></div>
+
+  <!-- SLIDE 1: Cover -->
+  <div class="slide active" data-slide="0">
+    <div class="hero-section">
+      <div class="hero-badge">&#9889; Executive Pitch Deck &mdash; v2.0</div>
+      <h1 class="hero-title">Price Comparison<br><span>Engine</span></h1>
+      <p class="hero-subtitle">An AI-powered price discovery platform that turns comparison shopping into a monetization engine &mdash; for consumers, merchants, and AI assistants alike.</p>
+      <div class="hero-stats">
+        <div class="hero-stat"><div class="hero-stat-value">4</div><div class="hero-stat-label">Revenue Streams</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">9</div><div class="hero-stat-label">Microservices</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">AI</div><div class="hero-stat-label">Native Architecture</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">70%+</div><div class="hero-stat-label">Sponsored Margin</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 2: Problem -->
+  <div class="slide" data-slide="1">
+    <div class="slide-header">
+      <div>
+        <div class="slide-number">01 / The Problem</div>
+        <h2 class="slide-title">Why Price Comparison Still Hurts</h2>
+      </div>
+    </div>
+    <div class="problem-visual">
+      <div class="problem-card">
+        <span class="emoji">&#128269;</span>
+        <h3>Fragmented Discovery</h3>
+        <p>Shoppers open 8&ndash;12 tabs to compare prices. No single platform offers real-time, trustable price grids across all major vendors.</p>
+      </div>
+      <div class="arrow-connector">&rarr;</div>
+      <div class="problem-card">
+        <span class="emoji">&#128200;</span>
+        <h3>Stale Data</h3>
+        <p>Most aggregators update once a day. Flash sales, stock-outs, and price drops are missed &mdash; costing users real money.</p>
+      </div>
+      <div class="arrow-connector">&rarr;</div>
+      <div class="problem-card">
+        <span class="emoji">&#128176;</span>
+        <h3>Zero Monetization</h3>
+        <p>Scraped data is a commodity. Platforms bleed money on infrastructure without converting traffic into revenue.</p>
+      </div>
+    </div>
+    <div class="solution-banner">
+      <div class="icon">&#127919;</div>
+      <div>
+        <h3>PCE is the Solution</h3>
+        <p>Real-time scraping every 5 minutes. AI-powered buy recommendations. Four revenue streams built in from day one. Not just a price list &mdash; a price <em>intelligence</em> platform.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 3: Product Overview -->
+  <div class="slide" data-slide="2">
+    <div class="slide-header">
+      <div>
+        <div class="slide-number">02 / Product Overview</div>
+        <h2 class="slide-title">What PCE Actually Does</h2>
+        <p class="slide-subtitle">Think of it as a Bloomberg Terminal for retail prices &mdash; built for consumers, merchants, and AI agents.</p>
+      </div>
+    </div>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-icon" style="background:var(--accent-dim);color:var(--accent);">&#128241;</div>
+        <div class="card-title">Consumer Mobile App</div>
+        <div class="card-desc">Flutter cross-platform app with OCR receipt scanning, price history charts, watchlists, and AI buy-timing insights.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background:var(--purple-dim);color:#a78bfa;">&#128187;</div>
+        <div class="card-title">Real-Time API Backend</div>
+        <div class="card-desc">FastAPI server with 9 microservices. Scrapes prices every 5 min via Playwright browsers. Serves data to app, web, and partners.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background:rgba(240,192,64,0.12);color:var(--warning);">&#129302;</div>
+        <div class="card-title">AI Intelligence Layer</div>
+        <div class="card-desc">Vector embeddings find spec-equivalent cheaper alternatives. 90-day price history predicts "buy now" vs "wait" with confidence scores.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background:rgba(255,107,107,0.12);color:var(--danger);">&#128188;</div>
+        <div class="card-title">Merchant B2B Console</div>
+        <div class="card-desc">Dynamic repricing engine with circuit breakers. Merchants set rules; PCE auto-adjusts prices when competitors move &mdash; safely.</div>
+      </div>
+    </div>
+    <div class="metric-row">
+      <div class="metric"><div class="metric-value">5 min</div><div class="metric-label">Scrape Frequency</div></div>
+      <div class="metric"><div class="metric-value">90 days</div><div class="metric-label">Price History</div></div>
+      <div class="metric"><div class="metric-value">384-D</div><div class="metric-label">AI Vectors</div></div>
+      <div class="metric"><div class="metric-value">9</div><div class="metric-label">Docker Services</div></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 4: Consumer Features -->
+  <div class="slide" data-slide="3">
+    <div class="slide-header">
+      <div>
+        <div class="slide-number">03 / Consumer Features</div>
+        <h2 class="slide-title">The Shopper Experience</h2>
+        <p class="slide-subtitle">Every feature designed to save money, build trust, and keep users coming back.</p>
+      </div>
+    </div>
+    <div class="feature-showcase">
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <div class="card-icon" style="background:var(--accent-dim);color:var(--accent);margin:0;">&#128269;</div>
+          <div><div class="card-title" style="margin:0;">Smart Search & Price Grid</div><span class="tag tag-live">Live</span></div>
+        </div>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> Search across all vendors with fuzzy matching</li>
+          <li><span class="check">&#10003;</span> Side-by-side price grid with stock status</li>
+          <li><span class="check">&#10003;</span> Direct affiliate buy links (revenue stream #1)</li>
+          <li><span class="check">&#10003;</span> Redis-cached results for instant response</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <div class="card-icon" style="background:rgba(240,192,64,0.12);color:var(--warning);margin:0;">&#128200;</div>
+          <div><div class="card-title" style="margin:0;">Price History & Insights</div><span class="tag tag-ai">AI-Powered</span></div>
+        </div>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> 30&ndash;365 day price trend charts</li>
+          <li><span class="check">&#10003;</span> "Buy Now" vs "Wait" AI recommendation</li>
+          <li><span class="check">&#10003;</span> Confidence scoring based on 90-day stats</li>
+          <li><span class="check">&#10003;</span> Historical min / avg / median analysis</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <div class="card-icon" style="background:var(--purple-dim);color:#a78bfa;margin:0;">&#128203;</div>
+          <div><div class="card-title" style="margin:0;">Watchlist & Alerts</div><span class="tag tag-live">Live</span></div>
+        </div>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> Save products to personal watchlist</li>
+          <li><span class="check">&#10003;</span> Email alerts when target price hits</li>
+          <li><span class="check">&#10003;</span> Push notifications via Firebase FCM</li>
+          <li><span class="check">&#10003;</span> One-tap remove when purchased</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <div class="card-icon" style="background:rgba(255,107,107,0.12);color:var(--danger);margin:0;">&#128247;</div>
+          <div><div class="card-title" style="margin:0;">OCR Receipt Scanner</div><span class="tag tag-ai">AI-Powered</span></div>
+        </div>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> Point camera at any receipt / invoice</li>
+          <li><span class="check">&#10003;</span> Google ML Kit extracts amounts, dates, IDs</li>
+          <li><span class="check">&#10003;</span> Auto-sync to cloud scan history</li>
+          <li><span class="check">&#10003;</span> Track spending patterns over time</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 5: Merchant B2B -->
+  <div class="slide" data-slide="4">
+    <div class="slide-header">
+      <div>
+        <div class="slide-number">04 / B2B Merchant Engine</div>
+        <h2 class="slide-title">The Merchant Command Center</h2>
+        <p class="slide-subtitle">PCE doesn't just show prices &mdash; it helps merchants <em>win</em> on price, automatically and safely.</p>
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="info-box">
+        <h4><span style="color:var(--accent);">&#9881;</span> Dynamic Repricing Rules</h4>
+        <p>Merchants configure rules like <em>"undercut Amazon by Rs. 50, but never below my 15% margin floor."</em> PCE monitors competitor prices every 5 minutes and calculates the optimal counter-price instantly.</p>
+        <ul><li>Undercut by fixed amount or percentage</li><li>Match competitor exactly</li><li>Respect MAP (Minimum Advertised Price) rules</li><li>Margin floor protection</li></ul>
+      </div>
+      <div class="info-box">
+        <h4><span style="color:var(--warning);">&#128737;</span> Circuit Breaker Safety</h4>
+        <p>A bad scrape or bug could crash a merchant's price to zero. The circuit breaker caps daily price drops at 10%, preventing catastrophic losses. Think of it as an airbag for pricing.</p>
+        <ul><li>24-hour rolling window monitoring</li><li>Auto-caps price velocity</li><li>Full audit trail of every decision</li><li>Merchant override capability</li></ul>
+      </div>
+      <div class="info-box">
+        <h4><span style="color:#a78bfa;">&#128279;</span> Auto Webhook Integration</h4>
+        <p>When a competitor drops price, PCE evaluates the merchant's rules and instantly POSTs a recommended price to the merchant's e-commerce platform via secure webhook. Zero manual intervention.</p>
+        <ul><li>Real-time webhook dispatch</li><li>JSON payload with reasoning</li><li>Auto-apply or manual review mode</li><li>Retry logic with exponential backoff</li></ul>
+      </div>
+      <div class="info-box">
+        <h4><span style="color:var(--danger);">&#128221;</span> Audit & Compliance</h4>
+        <p>Every price change, every scrape, every decision is logged. Merchants and admins get full transparency into why a price was set &mdash; essential for legal and financial audits.</p>
+        <ul><li>Immutable price audit logs</li><li>Scraping compliance dashboard</li><li>robots.txt & domain allowlist checks</li><li>Rate limiting per domain</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 6: Tech Brain -->
+  <div class="slide" data-slide="5">
+    <div class="slide-header">
+      <div>
+        <div class="slide-number">05 / Technology Brain</div>
+        <h2 class="slide-title">How It Works (Simplified)</h2>
+        <p class="slide-subtitle">9 containerized services working in concert. No single point of failure. Built for scale.</p>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px;">
+      <div class="card" style="text-align:center;">
+        <div class="card-icon" style="background:var(--accent-dim);color:var(--accent);margin:0 auto 10px;">&#128187;</div>
+        <div class="card-title">API Server</div>
+        <div class="card-desc">FastAPI handles all requests. JWT-secured. CORS-protected. Prometheus metrics built-in.</div>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="card-icon" style="background:var(--purple-dim);color:#a78bfa;margin:0 auto 10px;">&#128451;</div>
+        <div class="card-title">PostgreSQL + pgVector</div>
+        <div class="card-desc">19 tables. Vector embeddings for AI search. Full-text search with triggers. 90-day price history.</div>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="card-icon" style="background:rgba(240,192,64,0.12);color:var(--warning);margin:0 auto 10px;">&#128736;</div>
+        <div class="card-title">Redis Cache</div>
+        <div class="card-desc">Sub-second search results. Celery message broker. Rate limiting. Session storage.</div>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="card-icon" style="background:rgba(255,107,107,0.12);color:var(--danger);margin:0 auto 10px;">&#128374;</div>
+        <div class="card-title">Playwright Scraper</div>
+        <div class="card-desc">Headless Chrome browsers. Compliance-first (robots.txt). International price parsing. Proxy support.</div>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="card-icon" style="background:var(--accent-dim);color:var(--accent);margin:0 auto 10px;">&#9889;</div>
+        <div class="card-title">Celery Workers (x2)</div>
+        <div class="card-desc">Default queue for scraping + emails. High-priority queue for push notifications + real-time feeds.</div>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="card-icon" style="background:var(--purple-dim);color:#a78bfa;margin:0 auto 10px;">&#128200;</div>
+        <div class="card-title">Prometheus + Grafana</div>
+        <div class="card-desc">Real-time dashboards. Uptime monitoring. Queue depth alerts. Business metrics visualization.</div>
+      </div>
+    </div>
+    <div class="tech-stack">
+      <span class="tech-pill">Python 3.11</span><span class="tech-pill">FastAPI</span><span class="tech-pill">PostgreSQL 16</span>
+      <span class="tech-pill">pgVector</span><span class="tech-pill">Redis 7</span><span class="tech-pill">Celery</span>
+      <span class="tech-pill">Playwright</span><span class="tech-pill">Docker</span><span class="tech-pill">Flutter</span>
+      <span class="tech-pill">Firebase FCM</span><span class="tech-pill">Prometheus</span><span class="tech-pill">Grafana</span>
+      <span class="tech-pill">Sentence-Transformers</span><span class="tech-pill">JWT Auth</span><span class="tech-pill">SendGrid</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 7: AI/ML -->
+  <div class="slide" data-slide="6">
+    <div class="slide-header">
+      <div>
+        <div class="slide-number">06 / AI & Machine Learning</div>
+        <h2 class="slide-title">The Intelligence Layer</h2>
+        <p class="slide-subtitle">PCE isn't just a database &mdash; it's a learning system that gets smarter with every price point.</p>
+      </div>
+    </div>
+    <div class="ai-feature">
+      <div class="ai-icon">&#129302;</div>
+      <div class="ai-content">
+        <h4>Buy Timing Prediction</h4>
+        <p>Analyzes 90 days of historical price data to tell users "BUY NOW" or "WAIT" with confidence percentages. Uses statistical analysis (min, avg, median, percentile) &mdash; no black box. Transparent reasoning included.</p>
+      </div>
+    </div>
+    <div class="ai-feature">
+      <div class="ai-icon">&#128268;</div>
+      <div class="ai-content">
+        <h4>Spec-Equivalent Alternative Finder</h4>
+        <p>Uses 384-dimensional vector embeddings (Sentence-Transformers) to find cheaper products with 75%+ spec similarity. Cross-brand recommendations that actually make sense.</p>
+      </div>
+    </div>
+    <div class="ai-feature">
+      <div class="ai-icon">&#128269;</div>
+      <div class="ai-content">
+        <h4>Hybrid Search (RRF)</h4>
+        <p>Combines full-text search (PostgreSQL tsvector) with vector similarity (pgVector cosine distance) using Reciprocal Rank Fusion. Results are both keyword-accurate and semantically relevant.</p>
+      </div>
+    </div>
+    <div class="ai-feature">
+      <div class="ai-icon">&#128203;</div>
+      <div class="ai-content">
+        <h4>OCR Receipt Intelligence</h4>
+        <p>Google ML Kit on-device OCR extracts invoice IDs, amounts, dates, and vendor names from physical receipts. No cloud OCR costs. Works offline. Privacy-first.</p>
+      </div>
+    </div>
+    <div class="ai-feature">
+      <div class="ai-icon">&#9881;</div>
+      <div class="ai-content">
+        <h4>Dynamic Pricing AI (B2B)</h4>
+        <p>Evaluates merchant rules against live competitor data, applies circuit breakers, and recommends optimal prices. The AI respects human-set guardrails &mdash; it optimizes within boundaries, never overrides them.</p>
+      </div>
+    </div>
+    <div style="margin-top:16px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">
+      <p style="font-size:12px;color:var(--text-secondary);"><strong style="color:var(--accent);">AI-Proofing Strategy:</strong> Don't fight AI &mdash; become infrastructure AI depends on. Build PCE AI API for Perplexity/ChatGPT to call. Build merchant AI co-pilot for dynamic pricing. Focus on proprietary data AI can't replicate: conversion attribution, partner relationships, 90-day price history.</p>
+    </div>
+  </div>
+
+  <!-- SLIDE 8: Revenue -->
+  <div class="slide" data-slide="7">
+    <div class="slide-header">
+      <div>
+        <div class="slide-number">07 / Revenue Models</div>
+        <h2 class="slide-title">Four Streams, One Platform</h2>
+        <p class="slide-subtitle">Diversified monetization means no single point of revenue failure. Each stream reinforces the others.</p>
+      </div>
+    </div>
+    <div class="revenue-bar">
+      <div class="revenue-label" style="min-width:170px;"><strong>1. Affiliate Commissions</strong></div>
+      <div class="revenue-bar-fill"><div class="revenue-bar-inner" style="width:25%;background:var(--accent);"></div></div>
+      <div class="revenue-amount">2.5% / sale</div>
+    </div>
+    <p style="font-size:11px;color:var(--text-muted);margin:3px 0 14px 184px;">Device-hash attribution. Every click tracked. Conversion webhooks from vendors. Zero leakage.</p>
+
+    <div class="revenue-bar">
+      <div class="revenue-label" style="min-width:170px;"><strong>2. Sponsored CPC</strong></div>
+      <div class="revenue-bar-fill"><div class="revenue-bar-inner" style="width:70%;background:var(--purple);"></div></div>
+      <div class="revenue-amount">70%+ margin</div>
+    </div>
+    <p style="font-size:11px;color:var(--text-muted);margin:3px 0 14px 184px;">Prepaid wallet system. Auction-based placement. Merchants bid for top spots. Daily budget caps.</p>
+
+    <div class="revenue-bar">
+      <div class="revenue-label" style="min-width:170px;"><strong>3. Partner Feed API</strong></div>
+      <div class="revenue-bar-fill"><div class="revenue-bar-inner" style="width:45%;background:var(--warning);"></div></div>
+      <div class="revenue-amount">Rs. 5K&ndash;1L/mo</div>
+    </div>
+    <p style="font-size:11px;color:var(--text-muted);margin:3px 0 14px 184px;">Tiered subscriptions. Tier 3 merchants push real-time inventory via API keys. Usage-based limits.</p>
+
+    <div class="revenue-bar">
+      <div class="revenue-label" style="min-width:170px;"><strong>4. PCE AI API (Future)</strong></div>
+      <div class="revenue-bar-fill"><div class="revenue-bar-inner" style="width:15%;background:var(--danger);"></div></div>
+      <div class="revenue-amount">TBD</div>
+    </div>
+    <p style="font-size:11px;color:var(--text-muted);margin:3px 0 0 184px;">Perplexity, ChatGPT, and other AI assistants call PCE for live price data. Revenue per API call.</p>
+
+    <div class="metric-row" style="margin-top:28px;">
+      <div class="metric"><div class="metric-value" style="font-size:24px;">Rs. 50L</div><div class="metric-label">Year 1 Revenue Target</div></div>
+      <div class="metric"><div class="metric-value" style="font-size:24px;">Rs. 3Cr</div><div class="metric-label">Year 3 Revenue Target</div></div>
+      <div class="metric"><div class="metric-value" style="font-size:24px;">40%</div><div class="metric-label">Blended Gross Margin</div></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 9: USP -->
+  <div class="slide" data-slide="8">
+    <div class="slide-header">
+      <div>
+        <div class="slide-number">08 / USP & Differentiators</div>
+        <h2 class="slide-title">Why PCE Wins</h2>
+        <p class="slide-subtitle">In a sea of price aggregators, these are the moats that matter.</p>
+      </div>
+    </div>
+    <div class="usp-grid">
+      <div class="usp-item">
+        <div class="usp-number">01</div>
+        <div class="usp-content">
+          <h4>Real-Time, Not Yesterday</h4>
+          <p>Scrapes every 5 minutes. Priority items every 15 minutes. Most competitors update once daily. PCE catches flash sales and stock-outs as they happen.</p>
+        </div>
+      </div>
+      <div class="usp-item">
+        <div class="usp-number">02</div>
+        <div class="usp-content">
+          <h4>AI-Native from Day One</h4>
+          <p>Vector search, buy-timing predictions, and spec-equivalent alternatives aren't bolt-ons. They're core to the architecture. Competitors are still keyword-only.</p>
+        </div>
+      </div>
+      <div class="usp-item">
+        <div class="usp-number">03</div>
+        <div class="usp-content">
+          <h4>Monetization Engine, Not Just a List</h4>
+          <p>Four revenue streams built in. Affiliate + CPC + API + future AI API. Most price sites are cost centers. PCE is a profit center.</p>
+        </div>
+      </div>
+      <div class="usp-item">
+        <div class="usp-number">04</div>
+        <div class="usp-content">
+          <h4>B2B Merchant Tools</h4>
+          <p>Dynamic repricing with circuit breakers. No consumer price platform offers merchant-grade pricing intelligence. PCE serves both sides of the market.</p>
+        </div>
+      </div>
+      <div class="usp-item">
+        <div class="usp-number">05</div>
+        <div class="usp-content">
+          <h4>Compliance-First Scraping</h4>
+          <p>robots.txt respect, domain allowlists, crawl delays, honest User-Agent. Legally defensible. Scalable without getting blocked or sued.</p>
+        </div>
+      </div>
+      <div class="usp-item">
+        <div class="usp-number">06</div>
+        <div class="usp-content">
+          <h4>Proprietary Data Moat</h4>
+          <p>90-day price history, conversion attribution by device hash, partner feed relationships. Data that AI giants can't replicate without years of operation.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 10: ROI -->
+  <div class="slide" data-slide="9">
+    <div class="slide-header">
+      <div>
+        <div class="slide-number">09 / ROI & Financials</div>
+        <h2 class="slide-title">The Business Case</h2>
+        <p class="slide-subtitle">Conservative projections based on Indian e-commerce market sizing and comparable platform benchmarks.</p>
+      </div>
+    </div>
+    <table class="roi-table">
+      <thead><tr><th>Metric</th><th>Year 1</th><th>Year 2</th><th>Year 3</th></tr></thead>
+      <tbody>
+        <tr><td>Monthly Active Users</td><td>50,000</td><td>300,000</td><td>1,000,000</td></tr>
+        <tr><td>Products Tracked</td><td>25,000</td><td>150,000</td><td>500,000</td></tr>
+        <tr><td>Affiliate Conversions / mo</td><td>2,500</td><td>18,000</td><td>70,000</td></tr>
+        <tr><td>Avg. Order Value (AOV)</td><td>Rs. 3,500</td><td>Rs. 4,000</td><td>Rs. 4,500</td></tr>
+        <tr><td>Affiliate Revenue (2.5%)</td><td class="highlight">Rs. 26L</td><td class="highlight">Rs. 2.16Cr</td><td class="highlight">Rs. 9.45Cr</td></tr>
+        <tr><td>Sponsored CPC Revenue</td><td class="highlight">Rs. 12L</td><td class="highlight">Rs. 90L</td><td class="highlight">Rs. 3.5Cr</td></tr>
+        <tr><td>Partner API Subscriptions</td><td class="highlight">Rs. 6L</td><td class="highlight">Rs. 36L</td><td class="highlight">Rs. 1.2Cr</td></tr>
+        <tr><td><strong>Total Revenue</strong></td><td><strong>Rs. 44L</strong></td><td><strong>Rs. 3.42Cr</strong></td><td><strong>Rs. 14.15Cr</strong></td></tr>
+        <tr><td>Operating Costs</td><td>Rs. 38L</td><td>Rs. 1.8Cr</td><td>Rs. 5.5Cr</td></tr>
+        <tr><td><strong>Net Profit</strong></td><td><strong style="color:var(--accent);">Rs. 6L</strong></td><td><strong style="color:var(--accent);">Rs. 1.62Cr</strong></td><td><strong style="color:var(--accent);">Rs. 8.65Cr</strong></td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top:16px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">
+      <p style="font-size:12px;color:var(--text-secondary);"><strong style="color:var(--accent);">Seed Ask:</strong> Rs. 1.5Cr for 18-month runway. Covers cloud infrastructure, 3-engineer team, compliance legal, and initial merchant acquisition. Break-even projected at Month 14 with conservative conversion assumptions.</p>
+    </div>
+  </div>
+
+  <!-- SLIDE 11: Roadmap -->
+  <div class="slide" data-slide="10">
+    <div class="slide-header">
+      <div>
+        <div class="slide-number">10 / Roadmap & Milestones</div>
+        <h2 class="slide-title">The Journey Ahead</h2>
+        <p class="slide-subtitle">From MVP to market leader in 4 phases. Each phase unlocks a new revenue stream.</p>
+      </div>
+    </div>
+    <div class="timeline">
+      <div class="timeline-item past">
+        <div class="timeline-title">Phase 0: Foundation (Completed)</div>
+        <div class="timeline-meta">Months 1&ndash;3 &middot; Investment: Rs. 15L</div>
+        <div class="timeline-desc">Core scraper, PostgreSQL schema, FastAPI backend, Flutter app skeleton, Docker infrastructure, JWT auth, basic search & price grid.</div>
+      </div>
+      <div class="timeline-item current">
+        <div class="timeline-title">Phase 1: Monetization Launch (Current)</div>
+        <div class="timeline-meta">Months 4&ndash;6 &middot; Investment: Rs. 25L</div>
+        <div class="timeline-desc">Affiliate click tracking, sponsored CPC engine, merchant wallets, partner feed API, push notifications (FCM), watchlists, price drop alerts. First 5 merchant partners onboarded.</div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-title">Phase 2: AI & Scale</div>
+        <div class="timeline-meta">Months 7&ndash;12 &middot; Investment: Rs. 40L</div>
+        <div class="timeline-desc">Buy-timing AI v2, merchant AI co-pilot, OCR receipt v2 with spending analytics, 50K MAU target, 10 merchant API partners, Perplexity/ChatGPT API integration (revenue stream #4).</div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-title">Phase 3: Market Dominance</div>
+        <div class="timeline-meta">Months 13&ndash;24 &middot; Investment: Rs. 70L</div>
+        <div class="timeline-desc">300K MAU, 500K products, white-label B2B offering for retailers, international vendor expansion (US/EU), Series A preparation at Rs. 15Cr ARR run-rate.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 12: Release Plan -->
+  <div class="slide" data-slide="11">
+    <div class="slide-header">
+      <div>
+        <div class="slide-number">11 / Release Plan</div>
+        <h2 class="slide-title">What Ships When</h2>
+        <p class="slide-subtitle">Tactical release schedule for the next 12 months. Each release is a revenue milestone.</p>
+      </div>
+    </div>
+    <div class="phase-card">
+      <div class="phase-header">
+        <span class="phase-title">&#127881; Release 2.0 &mdash; "Monetization" (Month 4&ndash;5)</span>
+        <span class="phase-duration">6 weeks</span>
+      </div>
+      <div class="phase-cost">Rs. 8L budget</div>
+      <div class="phase-items">
+        <span class="phase-item">Affiliate tracking dashboard</span>
+        <span class="phase-item">Sponsored CPC auction</span>
+        <span class="phase-item">Merchant wallet + prepaid credits</span>
+        <span class="phase-item">Partner feed API (Tier 3)</span>
+        <span class="phase-item">FCM push notifications</span>
+        <span class="phase-item">Watchlist v1</span>
+      </div>
+    </div>
+    <div class="phase-card">
+      <div class="phase-header">
+        <span class="phase-title">&#129302; Release 2.1 &mdash; "Intelligence" (Month 6&ndash;8)</span>
+        <span class="phase-duration">10 weeks</span>
+      </div>
+      <div class="phase-cost">Rs. 12L budget</div>
+      <div class="phase-items">
+        <span class="phase-item">AI buy-timing v2 (ML model)</span>
+        <span class="phase-item">Spec-equivalent alternatives</span>
+        <span class="phase-item">OCR receipt spending analytics</span>
+        <span class="phase-item">Merchant repricing webhooks</span>
+        <span class="phase-item">Circuit breaker v2</span>
+        <span class="phase-item">Grafana business dashboards</span>
+      </div>
+    </div>
+    <div class="phase-card">
+      <div class="phase-header">
+        <span class="phase-title">&#127758; Release 2.2 &mdash; "Platform" (Month 9&ndash;12)</span>
+        <span class="phase-duration">12 weeks</span>
+      </div>
+      <div class="phase-cost">Rs. 18L budget</div>
+      <div class="phase-items">
+        <span class="phase-item">PCE AI Public API</span>
+        <span class="phase-item">ChatGPT/Perplexity plugin</span>
+        <span class="phase-item">White-label B2B embed</span>
+        <span class="phase-item">iOS App Store launch</span>
+        <span class="phase-item">International vendor support</span>
+        <span class="phase-item">Advanced analytics for merchants</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 13: Closing -->
+  <div class="slide" data-slide="12">
+    <div class="hero-section">
+      <div class="hero-badge">&#127942; The Ask</div>
+      <h1 class="hero-title" style="font-size:32px;">Rs. 1.5Cr Seed<br><span>for 18 Months</span></h1>
+      <p class="hero-subtitle" style="max-width:520px;">PCE is not a price comparison website. It is a <strong>price intelligence infrastructure</strong> that consumers love, merchants pay for, and AI assistants depend on. The code is built. The monetization is live. We need capital to scale.</p>
+      <div class="hero-stats" style="margin-top:32px;">
+        <div class="hero-stat"><div class="hero-stat-value">14</div><div class="hero-stat-label">Months to Break-Even</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">40%</div><div class="hero-stat-label">Blended Margin</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">4x</div><div class="hero-stat-label">Revenue Streams</div></div>
+        <div class="hero-stat"><div class="hero-stat-value">AI</div><div class="hero-stat-label">Future-Proof</div></div>
+      </div>
+      <div style="margin-top:40px;padding:18px 28px;background:var(--surface);border:1px solid var(--border);border-radius:10px;max-width:460px;">
+        <p style="font-size:13px;color:var(--text-secondary);text-align:center;line-height:1.6;"><strong style="color:var(--accent);">Next Step:</strong> Deep-dive technical demo + merchant pilot results.<br>Contact: <span style="color:var(--text-primary);">founders@pce.io</span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAVIGATION -->
+  <div class="bottom-nav">
+    <button class="nav-btn" id="prevBtn" onclick="changeSlide(-1)"><span>&#8592;</span> Previous</button>
+    <div class="nav-dots" id="navDots"></div>
+    <button class="nav-btn" id="nextBtn" onclick="changeSlide(1)">Next <span>&#8594;</span></button>
+  </div>
+</div>
+
+<script>
+(function(){
+  let currentSlide = 0;
+  const totalSlides = 13;
+
+  function initDots() {
+    const container = document.getElementById('navDots');
+    container.innerHTML = '';
+    for (let i = 0; i < totalSlides; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+      dot.onclick = function() { goToSlide(i); };
+      container.appendChild(dot);
+    }
+  }
+
+  function updateUI() {
+    document.querySelectorAll('.slide').forEach((s, i) => {
+      s.classList.toggle('active', i === currentSlide);
+    });
+    document.querySelectorAll('.nav-dot').forEach((d, i) => {
+      d.classList.toggle('active', i === currentSlide);
+    });
+    document.getElementById('prevBtn').disabled = currentSlide === 0;
+    document.getElementById('nextBtn').disabled = currentSlide === totalSlides - 1;
+    document.getElementById('progressFill').style.width = ((currentSlide + 1) / totalSlides * 100) + '%';
+  }
+
+  window.changeSlide = function(dir) {
+    const next = currentSlide + dir;
+    if (next >= 0 && next < totalSlides) {
+      currentSlide = next;
+      updateUI();
+    }
+  };
+
+  window.goToSlide = function(n) {
+    currentSlide = n;
+    updateUI();
+  };
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowRight') window.changeSlide(1);
+    if (e.key === 'ArrowLeft') window.changeSlide(-1);
+  });
+
+  initDots();
+  updateUI();
+})();
+</script>
+</body>
+</html>
