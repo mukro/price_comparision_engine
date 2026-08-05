@@ -9,6 +9,7 @@ Tasks:
 - check_price_drops         : Watchlist price drop → push queue (NEW)
 - process_partner_feed      : Batch process partner feed logs (NEW)
 """
+import json
 import asyncio
 import logging
 from typing import Any, Dict, List

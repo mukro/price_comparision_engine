@@ -1,0 +1,27 @@
+docker compose down
+docker compose up -d db
+
+# Wait 5 seconds for DB to boot, then create extensions
+docker compose exec db psql -U price_engine -d price_comparison -c "CREATE EXTENSION IF NOT EXISTS vector;"
+docker compose exec db psql -U price_engine -d price_comparison -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+docker compose exec db psql -U price_engine -d price_comparison -c "CREATE EXTENSION IF NOT EXISTS uuid-ossp;"
+
+# Now run the schema
+docker compose exec -T db psql -v ON_ERROR_STOP=1 -U price_engine -d price_comparison < pce_unified_schema_v3.sql
+
+\# Install build tools and pgvector inside the running container
+docker compose exec db bash -c "
+  apt-get update &&
+  apt-get install -y postgresql-server-dev-16 build-essential git &&
+  cd /tmp &&
+  git clone --branch v0.7.4 https://github.com/pgvector/pgvector.git &&
+  cd pgvector &&
+  make &&
+  make install
+"
+
+# Restart the container so Postgres picks up the new .so file
+docker compose restart db
+
+# Now create the extension
+docker compose exec db psql -U price_engine -d price_comparison -c "CREATE EXTENSION IF NOT EXISTS vector;"
