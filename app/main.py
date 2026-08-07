@@ -4,24 +4,24 @@ Price Comparison Engine API v2.0
 Monetization-ready: affiliate tracking, partner feeds, sponsored listings,
 user auth, watchlists, and push notifications.
 """
+from app.core.telemetry_metrics import setup_prometheus_metrics
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app import db
 from app.api import (
     admin,
+    affiliate,  # NEW: click tracking + conversion webhooks
     alerts,
-    affiliate,       # NEW: click tracking + conversion webhooks
-    auth,            # NEW: user JWT auth
+    auth,  # NEW: user JWT auth
     merchant,
-    partner_feed,    # NEW: Tier 3 partner feed ingestion
+    partner_feed,  # NEW: Tier 3 partner feed ingestion
     products,
-    sponsored,       # NEW: promoted listings + merchant wallet
-    watchlist,       # NEW: user watchlists + price drop alerts
+    sponsored,  # NEW: promoted listings + merchant wallet
+    watchlist,  # NEW: user watchlists + price drop alerts
 )
 from app.config import settings
-from app.core.telemetry_metrics import setup_prometheus_metrics
-from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(
     title="Price Comparison Engine API",
