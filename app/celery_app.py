@@ -1,16 +1,15 @@
-# app/celery_app.py
 """
 Celery application factory.
 
 Workers:
-- default      : General purpose tasks (scraping, emails, notifications)
+- default : General purpose tasks (scraping, emails, notifications)
 - high_priority: Urgent tasks (push notifications, real-time updates)
 
 Beat Schedule:
-- Every 5 min  : Scrape vendors, check price drops
+- Every 5 min : Scrape vendors, check price drops
 - Every 10 min : Send price drop emails
-- Daily 00:00  : Reset sponsored ad budgets
-- Weekly       : Archive old affiliate clicks
+- Daily 00:00 : Reset sponsored ad budgets
+- Weekly : Archive old affiliate clicks
 """
 import os
 from celery import Celery
@@ -27,9 +26,11 @@ def create_celery_app() -> Celery:
         broker=os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
         backend=os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
         include=[
-            "app.tasks",
-            "app.workers.scraper_worker",
-            "app.workers.email_worker",
+            "app.tasks",                 # canonical scraping + email tasks
+            "app.tasks_new",             # NEW: push notifications, budget reset, click archive
+            "app.tasks_autobuy",         # AutoBuy orchestrator
+            "app.tasks_credit_scoring",  # nightly trust-score batch
+            "app.tasks_agents",          # agentic AI pipelines
         ],
     )
 
@@ -43,9 +44,9 @@ def create_celery_app() -> Celery:
         timezone="UTC",
         enable_utc=True,
         task_track_started=True,
-        task_time_limit=300,           # 5 min hard limit per task
-        task_soft_time_limit=240,      # 4 min soft limit
-        worker_prefetch_multiplier=1,  # Fair task distribution
+        task_time_limit=300,          # 5 min hard limit per task
+        task_soft_time_limit=240,     # 4 min soft limit
+        worker_prefetch_multiplier=1, # Fair task distribution
         worker_max_tasks_per_child=50, # Restart worker after 50 tasks (memory leak prevention)
     )
 
@@ -62,29 +63,43 @@ def create_celery_app() -> Celery:
 
         # --- Email Alerts (existing) ---
         "price-drop-emails": {
-            "task": "app.tasks.trigger_price_drop_emails",
+            "task": "app.tasks_new.trigger_price_drop_emails",
             "schedule": 600.0,  # 10 minutes
             "options": {"queue": "default"},
         },
 
         # --- Push Notifications (NEW) ---
         "price-drop-push-notifications": {
-            "task": "app.tasks.check_price_drops_and_queue_push",
+            "task": "app.tasks_new.check_price_drops_and_queue_push",
             "schedule": 300.0,  # 5 minutes
             "options": {"queue": "high_priority"},
         },
 
         # --- Sponsored Ads Daily Reset (NEW) ---
         "reset-sponsored-budgets": {
-            "task": "app.tasks.reset_daily_sponsored_budgets",
+            "task": "app.tasks_new.reset_daily_sponsored_budgets",
             "schedule": 86400.0,  # 24 hours
             "options": {"queue": "default"},
         },
 
         # --- Affiliate Click Cleanup (NEW) ---
         "archive-old-clicks": {
-            "task": "app.tasks.archive_old_clicks",
+            "task": "app.tasks_new.archive_old_clicks",
             "schedule": 604800.0,  # 7 days
+            "options": {"queue": "default"},
+        },
+
+        # --- AutoBuy Trigger Scanner (NEW) ---
+        "scan-autobuy-triggers": {
+            "task": "app.tasks_autobuy.scan_auto_buy_triggers",
+            "schedule": 300.0,  # 5 minutes
+            "options": {"queue": "high_priority"},
+        },
+
+        # --- Credit Score Nightly Batch (NEW) ---
+        "recalculate-credit-scores": {
+            "task": "app.tasks_credit_scoring.recalculate_all_credit_scores",
+            "schedule": 86400.0,  # 24 hours (run at 2 AM via crontab override if needed)
             "options": {"queue": "default"},
         },
     }
@@ -93,12 +108,17 @@ def create_celery_app() -> Celery:
     # Task Routes (send specific tasks to specific queues)
     # ------------------------------------------------------------------
     app.conf.task_routes = {
-        "app.tasks.send_fcm_push_notification": {"queue": "high_priority"},
-        "app.tasks.process_vendor_scrape": {"queue": "default"},
-        "app.tasks.trigger_price_drop_emails": {"queue": "default"},
-        "app.tasks.check_price_drops_and_queue_push": {"queue": "high_priority"},
-        "app.tasks.reset_daily_sponsored_budgets": {"queue": "default"},
-        "app.tasks.archive_old_clicks": {"queue": "default"},
+        "app.tasks_new.send_fcm_push_notification": {"queue": "high_priority"},
+        "app.tasks_new.process_vendor_scrape": {"queue": "default"},
+        "app.tasks_new.trigger_price_drop_emails": {"queue": "default"},
+        "app.tasks_new.check_price_drops_and_queue_push": {"queue": "high_priority"},
+        "app.tasks_new.reset_daily_sponsored_budgets": {"queue": "default"},
+        "app.tasks_new.archive_old_clicks": {"queue": "default"},
+        "app.tasks_autobuy.execute_auto_buy": {"queue": "high_priority"},
+        "app.tasks_autobuy.scan_auto_buy_triggers": {"queue": "high_priority"},
+        "app.tasks_autobuy.retry_auto_buy": {"queue": "high_priority"},
+        "app.tasks_credit_scoring.update_user_credit_score": {"queue": "default"},
+        "app.tasks_credit_scoring.recalculate_all_credit_scores": {"queue": "default"},
     }
 
     # ------------------------------------------------------------------
@@ -109,13 +129,11 @@ def create_celery_app() -> Celery:
 
     return app
 
-
 # ------------------------------------------------------------------
 # Singleton Instance
 # ------------------------------------------------------------------
 
 celery_app = create_celery_app()
-
 
 # ------------------------------------------------------------------
 # Signals

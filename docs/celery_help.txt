@@ -1,0 +1,2 @@
+curl http://localhost:8000/health
+celery -A app.celery_app:celery_app inspect registered

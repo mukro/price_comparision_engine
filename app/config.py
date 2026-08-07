@@ -1,7 +1,5 @@
-# app/config.py
 from pydantic import Field, validator
 from pydantic_settings import BaseSettings
-
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Price Comparison Platform"
@@ -15,6 +13,7 @@ class Settings(BaseSettings):
 
     # --- Redis ---
     REDIS_URL: str = Field(..., min_length=1)
+    REDIS_PASSWORD: str = Field(default="")   # <-- FIX: docker-compose uses this
 
     # --- Email ---
     SENDGRID_API_KEY: str = Field(default="")
@@ -26,34 +25,43 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = Field(default=60, ge=5)
 
     # Admin credentials — MUST be bcrypt hash in production.
-    # Generate once: python -c "from passlib.hash import bcrypt; print(bcrypt.hash('yourpassword'))"
     ADMIN_EMAIL: str = Field(default="admin@example.com")
     ADMIN_PASSWORD_HASH: str = Field(
-        default="$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW"  # hash of "changeme"
+        default="$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW" # hash of "changeme"
     )
 
     # --- CORS ---
     ALLOWED_ORIGINS: str = Field(default="http://localhost:3000")
 
+    # --- Razorpay (AutoBuy payment gateway) ---
+    RAZORPAY_KEY_ID: str = Field(default="")
+    RAZORPAY_KEY_SECRET: str = Field(default="")
+
+    # --- FCM / Push Notifications ---
+    FCM_SERVER_KEY: str = Field(default="")
+    FCM_PROJECT_ID: str = Field(default="")
+
+    # --- Agentic AI (tasks_agents.py) ---
+    AGENTS_ENABLED: bool = Field(default=False)
+
     # --- Compliance / Scraping Governance ---
-    # Master switch: if False, ALL scraping tasks become no-ops.
     SCRAPING_ENABLED: bool = Field(default=True)
-    # Default requests-per-minute cap per domain when no vendor-specific rule exists.
     DEFAULT_SCRAPE_RPM: int = Field(default=6, ge=1, le=120)
-    # If True, every scrape checks robots.txt and aborts if disallowed.
     ENFORCE_ROBOTS_TXT: bool = Field(default=True)
-    # If True, only domains explicitly allow-listed in the DB can be scraped.
     ENFORCE_DOMAIN_ALLOWLIST: bool = Field(default=False)
-    # Global user-agent string.
     SCRAPER_USER_AGENT: str = Field(
         default="Mozilla/5.0 (compatible; PriceComparisonBot/1.0; +https://example.com/bot)"
     )
-    # Playwright proxy (optional), e.g. "http://proxy:8080"
     SCRAPER_PROXY_URL: str = Field(default="")
-    # Max browser pages to keep open per worker process.
     BROWSER_MAX_PAGES: int = Field(default=4, ge=1, le=20)
-    # Scrape timeout in milliseconds.
     SCRAPER_TIMEOUT_MS: int = Field(default=15000, ge=5000, le=60000)
+
+    # --- Flower / Monitoring ---
+    FLOWER_USER: str = Field(default="admin")
+    FLOWER_PASSWORD: str = Field(default="admin")
+
+    # --- Grafana ---
+    GRAFANA_ADMIN_PASSWORD: str = Field(default="admin")
 
     @property
     def DATABASE_URL(self) -> str:
@@ -70,6 +78,5 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
-
 
 settings = Settings()

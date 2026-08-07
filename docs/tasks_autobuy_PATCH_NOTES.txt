@@ -1,0 +1,44 @@
+# PATCH NOTES for app/tasks_autobuy.py
+# Apply these 3 surgical edits:
+
+# ------------------------------------------------------------------
+# EDIT 1  (line ~17):  fix Razorpay settings references in comments
+# ------------------------------------------------------------------
+# OLD comment block inside _node_payment_preauth:
+#     # import razorpay
+#     # client = razorpay.Client(auth=(settings.RAZORPAY_KEY, settings.RAZORPAY_SECRET))
+# NEW:
+#     # import razorpay
+#     # client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+
+# ------------------------------------------------------------------
+# EDIT 2  (line ~340, inside _finalize):  guard None payment_method
+# ------------------------------------------------------------------
+# OLD:
+#     "pm_id": state["payment_method"]["id"] if state["payment_method"] else None,
+# This line is actually already safe (has the if-else guard).
+# BUT the line above it can crash if credit gate failed before payment_method was set:
+#     state["payment_method"]["id"] if state["payment_method"] else None
+# This IS safe. No change needed for this specific line.
+
+# HOWEVER, _finalize also does:
+#     "trust_score": state.get("credit_profile", {}).get("trust_score"),
+# which is safe.
+
+# The real risk is that _finalize is called even when state["payment_method"] is None
+# and the line:
+#     "pm_id": state["payment_method"]["id"] if state["payment_method"] else None,
+# is actually fine.
+
+# No runtime crash expected in _finalize. The existing code is defensive enough.
+
+# ------------------------------------------------------------------
+# EDIT 3  (line ~270, inside _node_place_order):  add order_id to INSERT
+# ------------------------------------------------------------------
+# The payment_transactions INSERT in _node_payment_preauth currently omits order_id.
+# This is INTENTIONAL — it inserts with NULL order_id, then updates it later.
+# Since the schema now allows NULL, this is CORRECT. No edit needed.
+
+# VERDICT: tasks_autobuy.py needs NO code changes to boot cleanly.
+# The only "fix" is updating the Razorpay comment block for correctness.
+# SessionLocal will resolve once app/database.py is created.

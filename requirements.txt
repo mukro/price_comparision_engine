@@ -9,6 +9,7 @@ uvicorn[standard]>=0.28.0
 # --- Database ---
 asyncpg>=0.29.0
 psycopg2-binary>=2.9.9
+sqlalchemy>=2.0.0
 
 # --- Cache & Message Broker ---
 redis>=5.0.0
